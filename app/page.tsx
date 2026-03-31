@@ -71,12 +71,15 @@ export default function SearchPage() {
   // Reset zoom when map level changes
   useEffect(() => { setMapPosition({ coordinates: [0, 0], zoom: 1 }) }, [mapLevel, selectedState, selectedCounty])
 
-  // Allow left click, middle mouse, and scroll wheel for zoom/pan (default blocks middle mouse)
+  // Only allow right-click drag for panning (button=2), scroll wheel for zoom
+  // Left click (button=0) passes through for clicking states/counties/pins
   const filterZoom = useCallback((evt: any) => {
-    // Allow wheel events (zoom) and any mouse button for pan (0=left, 1=middle)
+    if (!evt) return true
+    // Always allow wheel events (zoom)
     if (evt.type === "wheel") return true
-    if (evt.type === "mousedown" || evt.type === "mousemove") return !evt.ctrlKey
-    return !evt.ctrlKey && !evt.button
+    // For mouse events, only allow right button (2) for pan
+    if (evt.type === "mousedown") return evt.button === 2
+    return true
   }, [])
 
   // List view state
@@ -376,7 +379,7 @@ export default function SearchPage() {
 
           {/* ─── MAP VIEW ──────────────────────────────────── */}
           {viewMode === "map" && (
-            <div className="flex-1 relative" data-tutorial="map-area">
+            <div className="flex-1 relative" data-tutorial="map-area" onContextMenu={(e) => e.preventDefault()}>
               {/* National level: AlbersUsa choropleth */}
               {mapLevel === "national" && (
                 <div className="w-full h-full">
@@ -452,9 +455,6 @@ export default function SearchPage() {
                       style={{ width: "100%", height: "100%" }}
                     >
                       <ZoomableGroup
-                        center={mapPosition.coordinates}
-                        zoom={mapPosition.zoom}
-                        onMoveEnd={handleMoveEnd}
                         filterZoomEvent={filterZoom}
                         minZoom={0.5}
                         maxZoom={20}
@@ -553,9 +553,6 @@ export default function SearchPage() {
                       style={{ width: "100%", height: "100%" }}
                     >
                       <ZoomableGroup
-                        center={mapPosition.coordinates}
-                        zoom={mapPosition.zoom}
-                        onMoveEnd={handleMoveEnd}
                         filterZoomEvent={filterZoom}
                         minZoom={0.5}
                         maxZoom={20}
