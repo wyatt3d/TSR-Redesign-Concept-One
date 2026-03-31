@@ -79,6 +79,7 @@ export default function SearchPage() {
   )
   const [prevFilters, setPrevFilters] = useState<{
     sources: SourceId[]; propertyTypes: PropertyType[]; dealTypes: DealType[]
+    mapLevel: MapLevel; selectedState: string | null; selectedCounty: string | null
   } | null>(null)
 
   const toggleSource = (id: SourceId) => { setSelectedSources((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id]); setCurrentPage(1) }
@@ -88,11 +89,28 @@ export default function SearchPage() {
   const handleChatAction = useCallback((action: ChatAction) => {
     switch (action.type) {
       case "APPLY_FILTERS": {
-        setPrevFilters({ sources: selectedSources, propertyTypes: selectedPropertyTypes, dealTypes: selectedDealTypes })
+        setPrevFilters({
+          sources: selectedSources,
+          propertyTypes: selectedPropertyTypes,
+          dealTypes: selectedDealTypes,
+          mapLevel,
+          selectedState,
+          selectedCounty,
+        })
         const f = action.filters
         if (f.sources) setSelectedSources(f.sources)
         if (f.propertyTypes) setSelectedPropertyTypes(f.propertyTypes)
         if (f.dealTypes) setSelectedDealTypes(f.dealTypes)
+        // If a state filter is specified, drill into that state on the map
+        if (f.states && f.states.length === 1) {
+          const stateInfo = STATE_LISTINGS.find((s) => s.abbr === f.states![0])
+          if (stateInfo) {
+            setSelectedState(stateInfo.abbr)
+            setMapLevel("state")
+            setSelectedCounty(null)
+            setSelectedListing(null)
+          }
+        }
         setCurrentPage(1)
         break
       }
@@ -101,6 +119,10 @@ export default function SearchPage() {
           setSelectedSources(prevFilters.sources)
           setSelectedPropertyTypes(prevFilters.propertyTypes)
           setSelectedDealTypes(prevFilters.dealTypes)
+          setMapLevel(prevFilters.mapLevel)
+          setSelectedState(prevFilters.selectedState)
+          setSelectedCounty(prevFilters.selectedCounty)
+          setSelectedListing(null)
           setPrevFilters(null)
           setCurrentPage(1)
         }

@@ -124,12 +124,16 @@ export function generateMockResponse(userPrompt: string): ChatMessage[] {
     const msgs: ChatMessage[] = []
 
     if (lower.includes("tax foreclosure") || lower.includes("foreclosure")) {
-      const filters: Partial<FilterPayload> = { dealTypes: ["foreclosure", "auction"] }
+      const filters: Partial<FilterPayload> = {
+        sources: ["tax_foreclosure", "mortgage_foreclosure", "auction_com", "ten_x", "hubzu", "hud", "homepath"],
+        dealTypes: ["foreclosure", "auction", "reo"],
+      }
       if (lower.includes("florida") || lower.includes(" fl")) filters.states = ["FL"]
       if (lower.includes("under $1") || lower.includes("under 1m")) filters.priceMax = 1000000
+      const stateLabel = filters.states ? "Florida " : ""
       msgs.push({
         id: makeId(), role: "assistant", timestamp: Date.now(), type: "filter_command",
-        content: `Filtered to ${lower.includes("florida") ? "Florida " : ""}tax foreclosures${lower.includes("under") ? " under $1M" : ""}. Here's what matches your criteria.`,
+        content: `Filtered to ${stateLabel}tax foreclosures${lower.includes("under") ? " under $1M" : ""}. Showing only foreclosure and auction sources.`,
         filters,
         resultCount: 23,
         applied: true,
@@ -147,10 +151,11 @@ export function generateMockResponse(userPrompt: string): ChatMessage[] {
         applied: true,
       })
     } else {
+      // Generic — try to do something visible
       msgs.push({
         id: makeId(), role: "assistant", timestamp: Date.now(), type: "filter_command",
         content: "Updated your filters based on that request.",
-        filters: {},
+        filters: { dealTypes: ["for_sale", "auction", "foreclosure"] },
         resultCount: 87,
         applied: true,
       })
