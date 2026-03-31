@@ -65,10 +65,7 @@ export const STATE_LISTINGS: StateData[] = [
 
 export const NATIONAL_TOTAL = STATE_LISTINGS.reduce((sum, s) => sum + s.totalListings, 0)
 
-// ─── County data (generated per state on drill-down) ────────────
-// In a real app this comes from an API. For the prototype, we
-// generate plausible county-level breakdowns procedurally.
-
+// ─── County data for all 50 states ──────────────────────────────
 export interface CountyData {
   name: string
   state: string
@@ -76,45 +73,51 @@ export interface CountyData {
   coords: [number, number]
 }
 
-// Seeded random for deterministic county generation
-function seeded(seed: number) {
-  const x = Math.sin(seed) * 10000
-  return x - Math.floor(x)
-}
-
-// Top counties per state (the ones that matter for display)
+// Real county names with approximate geographic centers for every state.
+// Top counties by population/listing volume, with "Other Counties" as remainder.
 const STATE_COUNTIES: Record<string, { name: string; coords: [number, number]; weight: number }[]> = {
-  FL: [
-    { name: "Miami-Dade", coords: [-80.3, 25.7], weight: 0.18 },
-    { name: "Broward", coords: [-80.2, 26.1], weight: 0.12 },
-    { name: "Palm Beach", coords: [-80.1, 26.7], weight: 0.10 },
-    { name: "Hillsborough", coords: [-82.4, 28.0], weight: 0.08 },
-    { name: "Orange", coords: [-81.4, 28.5], weight: 0.07 },
-    { name: "Duval", coords: [-81.7, 30.3], weight: 0.06 },
-    { name: "Pinellas", coords: [-82.7, 27.9], weight: 0.05 },
-    { name: "Lee", coords: [-81.9, 26.6], weight: 0.04 },
-    { name: "Polk", coords: [-81.7, 28.0], weight: 0.04 },
-    { name: "Brevard", coords: [-80.7, 28.3], weight: 0.03 },
-    { name: "Volusia", coords: [-81.1, 29.0], weight: 0.03 },
-    { name: "Sarasota", coords: [-82.3, 27.3], weight: 0.03 },
-    { name: "Seminole", coords: [-81.3, 28.7], weight: 0.02 },
-    { name: "Osceola", coords: [-81.2, 28.1], weight: 0.02 },
-    { name: "Other Counties", coords: [-82.5, 29.5], weight: 0.13 },
+  AL: [
+    { name: "Jefferson", coords: [-86.8, 33.5], weight: 0.14 },
+    { name: "Mobile", coords: [-88.1, 30.7], weight: 0.10 },
+    { name: "Madison", coords: [-86.6, 34.7], weight: 0.09 },
+    { name: "Baldwin", coords: [-87.7, 30.6], weight: 0.07 },
+    { name: "Tuscaloosa", coords: [-87.5, 33.2], weight: 0.06 },
+    { name: "Montgomery", coords: [-86.3, 32.4], weight: 0.06 },
+    { name: "Shelby", coords: [-86.7, 33.3], weight: 0.05 },
+    { name: "Lee", coords: [-85.4, 32.6], weight: 0.04 },
+    { name: "Morgan", coords: [-86.9, 34.5], weight: 0.04 },
+    { name: "Etowah", coords: [-86.0, 34.0], weight: 0.03 },
+    { name: "Other Counties", coords: [-87.0, 32.0], weight: 0.32 },
   ],
-  TX: [
-    { name: "Harris", coords: [-95.4, 29.8], weight: 0.16 },
-    { name: "Dallas", coords: [-96.8, 32.8], weight: 0.12 },
-    { name: "Tarrant", coords: [-97.3, 32.7], weight: 0.08 },
-    { name: "Bexar", coords: [-98.5, 29.4], weight: 0.08 },
-    { name: "Travis", coords: [-97.7, 30.3], weight: 0.07 },
-    { name: "Collin", coords: [-96.6, 33.2], weight: 0.05 },
-    { name: "Denton", coords: [-97.1, 33.2], weight: 0.04 },
-    { name: "Fort Bend", coords: [-95.8, 29.5], weight: 0.04 },
-    { name: "Williamson", coords: [-97.6, 30.6], weight: 0.03 },
-    { name: "Montgomery", coords: [-95.5, 30.3], weight: 0.03 },
-    { name: "El Paso", coords: [-106.4, 31.8], weight: 0.03 },
-    { name: "Hidalgo", coords: [-98.2, 26.4], weight: 0.03 },
-    { name: "Other Counties", coords: [-99.5, 33.5], weight: 0.24 },
+  AK: [
+    { name: "Anchorage", coords: [-149.9, 61.2], weight: 0.42 },
+    { name: "Matanuska-Susitna", coords: [-149.2, 61.8], weight: 0.16 },
+    { name: "Fairbanks North Star", coords: [-147.7, 64.8], weight: 0.12 },
+    { name: "Kenai Peninsula", coords: [-150.5, 60.5], weight: 0.10 },
+    { name: "Juneau", coords: [-134.4, 58.3], weight: 0.08 },
+    { name: "Other Boroughs", coords: [-152.0, 63.0], weight: 0.12 },
+  ],
+  AZ: [
+    { name: "Maricopa", coords: [-112.1, 33.4], weight: 0.58 },
+    { name: "Pima", coords: [-110.9, 32.1], weight: 0.14 },
+    { name: "Pinal", coords: [-111.3, 32.9], weight: 0.06 },
+    { name: "Yavapai", coords: [-112.5, 34.6], weight: 0.04 },
+    { name: "Mohave", coords: [-113.8, 35.4], weight: 0.03 },
+    { name: "Yuma", coords: [-114.3, 32.7], weight: 0.03 },
+    { name: "Coconino", coords: [-111.6, 35.8], weight: 0.03 },
+    { name: "Cochise", coords: [-109.8, 31.9], weight: 0.02 },
+    { name: "Other Counties", coords: [-111.0, 33.8], weight: 0.07 },
+  ],
+  AR: [
+    { name: "Pulaski", coords: [-92.4, 34.8], weight: 0.18 },
+    { name: "Benton", coords: [-94.2, 36.3], weight: 0.12 },
+    { name: "Washington", coords: [-94.2, 36.0], weight: 0.08 },
+    { name: "Sebastian", coords: [-94.2, 35.2], weight: 0.06 },
+    { name: "Faulkner", coords: [-92.3, 35.2], weight: 0.05 },
+    { name: "Saline", coords: [-92.7, 34.6], weight: 0.05 },
+    { name: "Craighead", coords: [-90.7, 35.8], weight: 0.04 },
+    { name: "Garland", coords: [-93.1, 34.6], weight: 0.04 },
+    { name: "Other Counties", coords: [-92.0, 34.5], weight: 0.38 },
   ],
   CA: [
     { name: "Los Angeles", coords: [-118.2, 34.1], weight: 0.18 },
@@ -129,7 +132,286 @@ const STATE_COUNTIES: Record<string, { name: string; coords: [number, number]; w
     { name: "San Francisco", coords: [-122.4, 37.8], weight: 0.03 },
     { name: "Fresno", coords: [-119.8, 36.7], weight: 0.03 },
     { name: "San Mateo", coords: [-122.3, 37.5], weight: 0.02 },
-    { name: "Other Counties", coords: [-120.0, 39.5], weight: 0.30 },
+    { name: "Kern", coords: [-118.7, 35.4], weight: 0.02 },
+    { name: "Other Counties", coords: [-120.0, 39.5], weight: 0.28 },
+  ],
+  CO: [
+    { name: "Denver", coords: [-104.9, 39.7], weight: 0.14 },
+    { name: "El Paso", coords: [-104.8, 38.8], weight: 0.12 },
+    { name: "Arapahoe", coords: [-104.8, 39.6], weight: 0.08 },
+    { name: "Jefferson", coords: [-105.2, 39.7], weight: 0.07 },
+    { name: "Adams", coords: [-104.8, 39.9], weight: 0.07 },
+    { name: "Douglas", coords: [-104.9, 39.3], weight: 0.05 },
+    { name: "Larimer", coords: [-105.5, 40.7], weight: 0.05 },
+    { name: "Weld", coords: [-104.7, 40.5], weight: 0.04 },
+    { name: "Boulder", coords: [-105.3, 40.1], weight: 0.04 },
+    { name: "Mesa", coords: [-108.5, 39.0], weight: 0.03 },
+    { name: "Other Counties", coords: [-106.0, 38.5], weight: 0.31 },
+  ],
+  CT: [
+    { name: "Fairfield", coords: [-73.3, 41.2], weight: 0.25 },
+    { name: "Hartford", coords: [-72.7, 41.8], weight: 0.22 },
+    { name: "New Haven", coords: [-72.9, 41.3], weight: 0.22 },
+    { name: "Litchfield", coords: [-73.2, 41.8], weight: 0.08 },
+    { name: "New London", coords: [-72.1, 41.4], weight: 0.08 },
+    { name: "Middlesex", coords: [-72.5, 41.4], weight: 0.06 },
+    { name: "Tolland", coords: [-72.3, 41.9], weight: 0.05 },
+    { name: "Windham", coords: [-71.9, 41.8], weight: 0.04 },
+  ],
+  DE: [
+    { name: "New Castle", coords: [-75.6, 39.6], weight: 0.55 },
+    { name: "Sussex", coords: [-75.3, 38.7], weight: 0.28 },
+    { name: "Kent", coords: [-75.5, 39.1], weight: 0.17 },
+  ],
+  FL: [
+    { name: "Miami-Dade", coords: [-80.3, 25.7], weight: 0.16 },
+    { name: "Broward", coords: [-80.2, 26.1], weight: 0.10 },
+    { name: "Palm Beach", coords: [-80.1, 26.7], weight: 0.08 },
+    { name: "Hillsborough", coords: [-82.4, 28.0], weight: 0.07 },
+    { name: "Orange", coords: [-81.4, 28.5], weight: 0.06 },
+    { name: "Duval", coords: [-81.7, 30.3], weight: 0.05 },
+    { name: "Pinellas", coords: [-82.7, 27.9], weight: 0.04 },
+    { name: "Lee", coords: [-81.9, 26.6], weight: 0.04 },
+    { name: "Polk", coords: [-81.7, 28.0], weight: 0.03 },
+    { name: "Brevard", coords: [-80.7, 28.3], weight: 0.03 },
+    { name: "Volusia", coords: [-81.1, 29.0], weight: 0.03 },
+    { name: "Sarasota", coords: [-82.3, 27.3], weight: 0.03 },
+    { name: "Pasco", coords: [-82.4, 28.3], weight: 0.03 },
+    { name: "Seminole", coords: [-81.3, 28.7], weight: 0.02 },
+    { name: "Marion", coords: [-82.1, 29.2], weight: 0.02 },
+    { name: "Other Counties", coords: [-82.5, 29.8], weight: 0.21 },
+  ],
+  GA: [
+    { name: "Fulton", coords: [-84.4, 33.8], weight: 0.14 },
+    { name: "Gwinnett", coords: [-84.0, 33.9], weight: 0.08 },
+    { name: "Cobb", coords: [-84.6, 33.9], weight: 0.06 },
+    { name: "DeKalb", coords: [-84.2, 33.8], weight: 0.06 },
+    { name: "Chatham", coords: [-81.1, 32.0], weight: 0.04 },
+    { name: "Cherokee", coords: [-84.5, 34.2], weight: 0.03 },
+    { name: "Clayton", coords: [-84.4, 33.5], weight: 0.03 },
+    { name: "Forsyth", coords: [-84.1, 34.2], weight: 0.03 },
+    { name: "Henry", coords: [-84.2, 33.4], weight: 0.03 },
+    { name: "Richmond", coords: [-82.0, 33.4], weight: 0.03 },
+    { name: "Bibb", coords: [-83.6, 32.8], weight: 0.02 },
+    { name: "Other Counties", coords: [-83.5, 32.0], weight: 0.45 },
+  ],
+  HI: [
+    { name: "Honolulu", coords: [-157.8, 21.3], weight: 0.60 },
+    { name: "Maui", coords: [-156.3, 20.8], weight: 0.15 },
+    { name: "Hawaii", coords: [-155.5, 19.7], weight: 0.15 },
+    { name: "Kauai", coords: [-159.5, 22.1], weight: 0.10 },
+  ],
+  ID: [
+    { name: "Ada", coords: [-116.2, 43.6], weight: 0.30 },
+    { name: "Canyon", coords: [-116.7, 43.6], weight: 0.12 },
+    { name: "Kootenai", coords: [-116.8, 47.7], weight: 0.10 },
+    { name: "Bonneville", coords: [-111.8, 43.5], weight: 0.06 },
+    { name: "Twin Falls", coords: [-114.5, 42.6], weight: 0.05 },
+    { name: "Bannock", coords: [-112.0, 42.9], weight: 0.04 },
+    { name: "Other Counties", coords: [-114.5, 45.0], weight: 0.33 },
+  ],
+  IL: [
+    { name: "Cook", coords: [-87.8, 41.8], weight: 0.32 },
+    { name: "DuPage", coords: [-88.1, 41.8], weight: 0.08 },
+    { name: "Lake", coords: [-87.9, 42.3], weight: 0.06 },
+    { name: "Will", coords: [-87.9, 41.4], weight: 0.06 },
+    { name: "Kane", coords: [-88.4, 41.9], weight: 0.04 },
+    { name: "McHenry", coords: [-88.5, 42.3], weight: 0.03 },
+    { name: "Winnebago", coords: [-89.1, 42.3], weight: 0.03 },
+    { name: "St. Clair", coords: [-90.0, 38.5], weight: 0.03 },
+    { name: "Madison", coords: [-89.7, 38.8], weight: 0.03 },
+    { name: "Champaign", coords: [-88.2, 40.1], weight: 0.02 },
+    { name: "Sangamon", coords: [-89.7, 39.8], weight: 0.02 },
+    { name: "Peoria", coords: [-89.6, 40.7], weight: 0.02 },
+    { name: "Other Counties", coords: [-89.5, 39.5], weight: 0.26 },
+  ],
+  IN: [
+    { name: "Marion", coords: [-86.2, 39.8], weight: 0.18 },
+    { name: "Lake", coords: [-87.4, 41.5], weight: 0.08 },
+    { name: "Allen", coords: [-85.1, 41.1], weight: 0.06 },
+    { name: "Hamilton", coords: [-86.0, 40.1], weight: 0.06 },
+    { name: "St. Joseph", coords: [-86.3, 41.7], weight: 0.04 },
+    { name: "Elkhart", coords: [-85.9, 41.6], weight: 0.04 },
+    { name: "Tippecanoe", coords: [-86.9, 40.4], weight: 0.03 },
+    { name: "Vanderburgh", coords: [-87.6, 38.0], weight: 0.03 },
+    { name: "Johnson", coords: [-86.1, 39.5], weight: 0.03 },
+    { name: "Other Counties", coords: [-86.2, 39.5], weight: 0.45 },
+  ],
+  IA: [
+    { name: "Polk", coords: [-93.6, 41.7], weight: 0.20 },
+    { name: "Linn", coords: [-91.6, 42.1], weight: 0.08 },
+    { name: "Scott", coords: [-90.6, 41.6], weight: 0.06 },
+    { name: "Johnson", coords: [-91.6, 41.7], weight: 0.06 },
+    { name: "Black Hawk", coords: [-92.3, 42.5], weight: 0.05 },
+    { name: "Woodbury", coords: [-96.3, 42.4], weight: 0.04 },
+    { name: "Story", coords: [-93.5, 42.0], weight: 0.04 },
+    { name: "Dubuque", coords: [-90.7, 42.5], weight: 0.04 },
+    { name: "Other Counties", coords: [-93.5, 42.0], weight: 0.43 },
+  ],
+  KS: [
+    { name: "Johnson", coords: [-94.8, 38.9], weight: 0.22 },
+    { name: "Sedgwick", coords: [-97.3, 37.7], weight: 0.15 },
+    { name: "Shawnee", coords: [-95.7, 39.0], weight: 0.08 },
+    { name: "Douglas", coords: [-95.2, 38.9], weight: 0.05 },
+    { name: "Wyandotte", coords: [-94.7, 39.1], weight: 0.05 },
+    { name: "Leavenworth", coords: [-95.0, 39.2], weight: 0.04 },
+    { name: "Riley", coords: [-96.7, 39.2], weight: 0.03 },
+    { name: "Other Counties", coords: [-98.5, 38.5], weight: 0.38 },
+  ],
+  KY: [
+    { name: "Jefferson", coords: [-85.7, 38.2], weight: 0.20 },
+    { name: "Fayette", coords: [-84.5, 38.0], weight: 0.10 },
+    { name: "Kenton", coords: [-84.5, 39.0], weight: 0.05 },
+    { name: "Boone", coords: [-84.7, 38.9], weight: 0.05 },
+    { name: "Warren", coords: [-86.4, 37.0], weight: 0.04 },
+    { name: "Hardin", coords: [-85.9, 37.7], weight: 0.04 },
+    { name: "Daviess", coords: [-87.1, 37.7], weight: 0.03 },
+    { name: "Campbell", coords: [-84.4, 39.0], weight: 0.03 },
+    { name: "Other Counties", coords: [-85.5, 37.5], weight: 0.46 },
+  ],
+  LA: [
+    { name: "East Baton Rouge", coords: [-91.1, 30.4], weight: 0.14 },
+    { name: "Jefferson", coords: [-90.2, 29.9], weight: 0.12 },
+    { name: "Orleans", coords: [-90.1, 30.0], weight: 0.10 },
+    { name: "Caddo", coords: [-93.9, 32.5], weight: 0.06 },
+    { name: "St. Tammany", coords: [-89.9, 30.4], weight: 0.06 },
+    { name: "Calcasieu", coords: [-93.2, 30.2], weight: 0.05 },
+    { name: "Lafayette", coords: [-92.0, 30.2], weight: 0.05 },
+    { name: "Ouachita", coords: [-92.1, 32.5], weight: 0.04 },
+    { name: "Rapides", coords: [-92.4, 31.2], weight: 0.03 },
+    { name: "Other Parishes", coords: [-92.0, 31.5], weight: 0.35 },
+  ],
+  ME: [
+    { name: "Cumberland", coords: [-70.3, 43.8], weight: 0.28 },
+    { name: "York", coords: [-70.7, 43.4], weight: 0.18 },
+    { name: "Penobscot", coords: [-68.8, 45.4], weight: 0.12 },
+    { name: "Kennebec", coords: [-69.8, 44.4], weight: 0.08 },
+    { name: "Androscoggin", coords: [-70.2, 44.2], weight: 0.07 },
+    { name: "Other Counties", coords: [-69.0, 45.0], weight: 0.27 },
+  ],
+  MD: [
+    { name: "Montgomery", coords: [-77.2, 39.1], weight: 0.18 },
+    { name: "Prince George's", coords: [-76.8, 38.8], weight: 0.14 },
+    { name: "Baltimore County", coords: [-76.6, 39.4], weight: 0.12 },
+    { name: "Baltimore City", coords: [-76.6, 39.3], weight: 0.10 },
+    { name: "Anne Arundel", coords: [-76.6, 39.0], weight: 0.08 },
+    { name: "Howard", coords: [-76.9, 39.2], weight: 0.05 },
+    { name: "Frederick", coords: [-77.4, 39.4], weight: 0.05 },
+    { name: "Harford", coords: [-76.3, 39.5], weight: 0.04 },
+    { name: "Other Counties", coords: [-76.0, 38.5], weight: 0.24 },
+  ],
+  MA: [
+    { name: "Middlesex", coords: [-71.4, 42.5], weight: 0.22 },
+    { name: "Suffolk", coords: [-71.1, 42.4], weight: 0.12 },
+    { name: "Worcester", coords: [-71.8, 42.3], weight: 0.12 },
+    { name: "Essex", coords: [-70.9, 42.7], weight: 0.10 },
+    { name: "Norfolk", coords: [-71.2, 42.2], weight: 0.08 },
+    { name: "Bristol", coords: [-71.1, 41.8], weight: 0.07 },
+    { name: "Plymouth", coords: [-70.8, 42.0], weight: 0.07 },
+    { name: "Hampden", coords: [-72.6, 42.1], weight: 0.05 },
+    { name: "Other Counties", coords: [-71.5, 42.0], weight: 0.17 },
+  ],
+  MI: [
+    { name: "Wayne", coords: [-83.2, 42.3], weight: 0.16 },
+    { name: "Oakland", coords: [-83.4, 42.6], weight: 0.10 },
+    { name: "Macomb", coords: [-82.9, 42.7], weight: 0.07 },
+    { name: "Kent", coords: [-85.5, 43.0], weight: 0.07 },
+    { name: "Genesee", coords: [-83.7, 43.0], weight: 0.04 },
+    { name: "Washtenaw", coords: [-83.8, 42.3], weight: 0.04 },
+    { name: "Ottawa", coords: [-86.1, 43.0], weight: 0.03 },
+    { name: "Ingham", coords: [-84.4, 42.6], weight: 0.03 },
+    { name: "Kalamazoo", coords: [-85.6, 42.2], weight: 0.03 },
+    { name: "Other Counties", coords: [-85.0, 44.5], weight: 0.43 },
+  ],
+  MN: [
+    { name: "Hennepin", coords: [-93.3, 45.0], weight: 0.22 },
+    { name: "Ramsey", coords: [-93.1, 45.0], weight: 0.10 },
+    { name: "Dakota", coords: [-93.1, 44.7], weight: 0.07 },
+    { name: "Anoka", coords: [-93.3, 45.3], weight: 0.06 },
+    { name: "Washington", coords: [-92.9, 45.0], weight: 0.04 },
+    { name: "St. Louis", coords: [-92.5, 47.5], weight: 0.04 },
+    { name: "Scott", coords: [-93.5, 44.6], weight: 0.03 },
+    { name: "Olmsted", coords: [-92.5, 44.0], weight: 0.03 },
+    { name: "Stearns", coords: [-94.5, 45.6], weight: 0.03 },
+    { name: "Other Counties", coords: [-94.5, 46.5], weight: 0.38 },
+  ],
+  MS: [
+    { name: "Hinds", coords: [-90.4, 32.3], weight: 0.12 },
+    { name: "Harrison", coords: [-89.1, 30.4], weight: 0.10 },
+    { name: "DeSoto", coords: [-89.9, 34.9], weight: 0.08 },
+    { name: "Rankin", coords: [-89.9, 32.3], weight: 0.06 },
+    { name: "Jackson", coords: [-88.6, 30.4], weight: 0.06 },
+    { name: "Lee", coords: [-88.7, 34.3], weight: 0.05 },
+    { name: "Forrest", coords: [-89.2, 31.2], weight: 0.04 },
+    { name: "Madison", coords: [-90.1, 32.5], weight: 0.04 },
+    { name: "Other Counties", coords: [-89.7, 33.0], weight: 0.45 },
+  ],
+  MO: [
+    { name: "St. Louis County", coords: [-90.4, 38.6], weight: 0.15 },
+    { name: "Jackson", coords: [-94.3, 39.0], weight: 0.12 },
+    { name: "St. Louis City", coords: [-90.2, 38.6], weight: 0.06 },
+    { name: "St. Charles", coords: [-90.7, 38.8], weight: 0.06 },
+    { name: "Greene", coords: [-93.3, 37.2], weight: 0.05 },
+    { name: "Clay", coords: [-94.4, 39.3], weight: 0.04 },
+    { name: "Boone", coords: [-92.3, 38.9], weight: 0.04 },
+    { name: "Jefferson", coords: [-90.5, 38.3], weight: 0.03 },
+    { name: "Other Counties", coords: [-92.5, 38.0], weight: 0.45 },
+  ],
+  MT: [
+    { name: "Yellowstone", coords: [-108.5, 45.8], weight: 0.18 },
+    { name: "Missoula", coords: [-114.0, 47.0], weight: 0.14 },
+    { name: "Gallatin", coords: [-111.1, 45.7], weight: 0.14 },
+    { name: "Flathead", coords: [-114.3, 48.2], weight: 0.12 },
+    { name: "Cascade", coords: [-111.3, 47.5], weight: 0.08 },
+    { name: "Lewis and Clark", coords: [-112.0, 47.1], weight: 0.06 },
+    { name: "Other Counties", coords: [-109.5, 47.0], weight: 0.28 },
+  ],
+  NE: [
+    { name: "Douglas", coords: [-96.0, 41.3], weight: 0.28 },
+    { name: "Lancaster", coords: [-96.7, 40.8], weight: 0.16 },
+    { name: "Sarpy", coords: [-96.0, 41.1], weight: 0.10 },
+    { name: "Hall", coords: [-98.3, 40.9], weight: 0.04 },
+    { name: "Buffalo", coords: [-99.0, 40.8], weight: 0.04 },
+    { name: "Other Counties", coords: [-99.8, 41.5], weight: 0.38 },
+  ],
+  NV: [
+    { name: "Clark", coords: [-115.2, 36.2], weight: 0.68 },
+    { name: "Washoe", coords: [-119.8, 39.5], weight: 0.18 },
+    { name: "Carson City", coords: [-119.8, 39.2], weight: 0.04 },
+    { name: "Lyon", coords: [-119.2, 39.0], weight: 0.03 },
+    { name: "Elko", coords: [-115.8, 40.8], weight: 0.02 },
+    { name: "Other Counties", coords: [-117.0, 40.0], weight: 0.05 },
+  ],
+  NH: [
+    { name: "Hillsborough", coords: [-71.7, 43.0], weight: 0.30 },
+    { name: "Rockingham", coords: [-71.1, 43.0], weight: 0.22 },
+    { name: "Merrimack", coords: [-71.7, 43.3], weight: 0.12 },
+    { name: "Strafford", coords: [-71.0, 43.3], weight: 0.08 },
+    { name: "Grafton", coords: [-71.8, 43.8], weight: 0.08 },
+    { name: "Other Counties", coords: [-71.5, 44.0], weight: 0.20 },
+  ],
+  NJ: [
+    { name: "Bergen", coords: [-74.1, 40.9], weight: 0.10 },
+    { name: "Middlesex", coords: [-74.3, 40.4], weight: 0.08 },
+    { name: "Essex", coords: [-74.2, 40.8], weight: 0.07 },
+    { name: "Hudson", coords: [-74.1, 40.7], weight: 0.06 },
+    { name: "Monmouth", coords: [-74.2, 40.3], weight: 0.06 },
+    { name: "Ocean", coords: [-74.2, 39.9], weight: 0.06 },
+    { name: "Union", coords: [-74.3, 40.7], weight: 0.05 },
+    { name: "Camden", coords: [-74.9, 39.9], weight: 0.05 },
+    { name: "Morris", coords: [-74.5, 40.9], weight: 0.05 },
+    { name: "Burlington", coords: [-74.7, 39.9], weight: 0.04 },
+    { name: "Passaic", coords: [-74.3, 41.0], weight: 0.04 },
+    { name: "Other Counties", coords: [-74.5, 40.2], weight: 0.34 },
+  ],
+  NM: [
+    { name: "Bernalillo", coords: [-106.6, 35.1], weight: 0.32 },
+    { name: "Doña Ana", coords: [-106.7, 32.4], weight: 0.12 },
+    { name: "Santa Fe", coords: [-106.0, 35.5], weight: 0.10 },
+    { name: "Sandoval", coords: [-106.9, 35.3], weight: 0.06 },
+    { name: "San Juan", coords: [-108.3, 36.8], weight: 0.05 },
+    { name: "Valencia", coords: [-106.7, 34.7], weight: 0.04 },
+    { name: "Other Counties", coords: [-106.0, 34.0], weight: 0.31 },
   ],
   NY: [
     { name: "New York City", coords: [-74.0, 40.7], weight: 0.25 },
@@ -141,55 +423,219 @@ const STATE_COUNTIES: Record<string, { name: string; coords: [number, number]; w
     { name: "Onondaga", coords: [-76.2, 43.0], weight: 0.03 },
     { name: "Albany", coords: [-73.8, 42.7], weight: 0.02 },
     { name: "Dutchess", coords: [-73.7, 41.7], weight: 0.02 },
-    { name: "Other Counties", coords: [-75.5, 44.0], weight: 0.42 },
+    { name: "Orange", coords: [-74.3, 41.4], weight: 0.02 },
+    { name: "Other Counties", coords: [-75.5, 44.0], weight: 0.40 },
   ],
-  GA: [
-    { name: "Fulton", coords: [-84.4, 33.8], weight: 0.15 },
-    { name: "Gwinnett", coords: [-84.0, 33.9], weight: 0.08 },
-    { name: "Cobb", coords: [-84.6, 33.9], weight: 0.06 },
-    { name: "DeKalb", coords: [-84.2, 33.8], weight: 0.06 },
-    { name: "Chatham", coords: [-81.1, 32.0], weight: 0.04 },
-    { name: "Cherokee", coords: [-84.5, 34.2], weight: 0.03 },
-    { name: "Clayton", coords: [-84.4, 33.5], weight: 0.03 },
-    { name: "Forsyth", coords: [-84.1, 34.2], weight: 0.03 },
-    { name: "Henry", coords: [-84.2, 33.4], weight: 0.02 },
-    { name: "Other Counties", coords: [-83.5, 32.0], weight: 0.50 },
+  NC: [
+    { name: "Mecklenburg", coords: [-80.8, 35.2], weight: 0.12 },
+    { name: "Wake", coords: [-78.6, 35.8], weight: 0.10 },
+    { name: "Guilford", coords: [-79.8, 36.1], weight: 0.05 },
+    { name: "Forsyth", coords: [-80.3, 36.1], weight: 0.04 },
+    { name: "Cumberland", coords: [-78.8, 35.1], weight: 0.04 },
+    { name: "Durham", coords: [-78.9, 36.0], weight: 0.03 },
+    { name: "Buncombe", coords: [-82.5, 35.6], weight: 0.03 },
+    { name: "New Hanover", coords: [-77.9, 34.2], weight: 0.03 },
+    { name: "Union", coords: [-80.5, 34.9], weight: 0.03 },
+    { name: "Cabarrus", coords: [-80.6, 35.4], weight: 0.03 },
+    { name: "Johnston", coords: [-78.5, 35.5], weight: 0.02 },
+    { name: "Other Counties", coords: [-79.5, 35.0], weight: 0.48 },
+  ],
+  ND: [
+    { name: "Cass", coords: [-96.9, 46.9], weight: 0.28 },
+    { name: "Burleigh", coords: [-100.8, 46.8], weight: 0.14 },
+    { name: "Grand Forks", coords: [-97.1, 47.9], weight: 0.10 },
+    { name: "Ward", coords: [-101.4, 48.2], weight: 0.08 },
+    { name: "Williams", coords: [-103.5, 48.3], weight: 0.07 },
+    { name: "Other Counties", coords: [-100.5, 47.5], weight: 0.33 },
+  ],
+  OH: [
+    { name: "Franklin", coords: [-83.0, 40.0], weight: 0.12 },
+    { name: "Cuyahoga", coords: [-81.7, 41.4], weight: 0.10 },
+    { name: "Hamilton", coords: [-84.5, 39.1], weight: 0.08 },
+    { name: "Summit", coords: [-81.5, 41.1], weight: 0.05 },
+    { name: "Montgomery", coords: [-84.2, 39.7], weight: 0.05 },
+    { name: "Lucas", coords: [-83.6, 41.7], weight: 0.04 },
+    { name: "Butler", coords: [-84.6, 39.4], weight: 0.04 },
+    { name: "Stark", coords: [-81.4, 40.8], weight: 0.03 },
+    { name: "Lorain", coords: [-82.2, 41.3], weight: 0.03 },
+    { name: "Mahoning", coords: [-80.8, 41.1], weight: 0.03 },
+    { name: "Other Counties", coords: [-82.8, 40.0], weight: 0.43 },
+  ],
+  OK: [
+    { name: "Oklahoma", coords: [-97.5, 35.5], weight: 0.22 },
+    { name: "Tulsa", coords: [-95.9, 36.2], weight: 0.18 },
+    { name: "Cleveland", coords: [-97.3, 35.2], weight: 0.06 },
+    { name: "Canadian", coords: [-97.9, 35.5], weight: 0.05 },
+    { name: "Comanche", coords: [-98.5, 34.7], weight: 0.04 },
+    { name: "Rogers", coords: [-95.6, 36.4], weight: 0.03 },
+    { name: "Wagoner", coords: [-95.5, 36.0], weight: 0.03 },
+    { name: "Other Counties", coords: [-97.5, 35.0], weight: 0.39 },
+  ],
+  OR: [
+    { name: "Multnomah", coords: [-122.4, 45.5], weight: 0.20 },
+    { name: "Washington", coords: [-122.8, 45.5], weight: 0.12 },
+    { name: "Clackamas", coords: [-122.3, 45.2], weight: 0.08 },
+    { name: "Lane", coords: [-122.8, 44.0], weight: 0.07 },
+    { name: "Marion", coords: [-122.6, 44.9], weight: 0.06 },
+    { name: "Jackson", coords: [-122.7, 42.4], weight: 0.05 },
+    { name: "Deschutes", coords: [-121.3, 44.0], weight: 0.05 },
+    { name: "Other Counties", coords: [-120.5, 44.0], weight: 0.37 },
+  ],
+  PA: [
+    { name: "Philadelphia", coords: [-75.2, 40.0], weight: 0.14 },
+    { name: "Allegheny", coords: [-80.0, 40.5], weight: 0.10 },
+    { name: "Montgomery", coords: [-75.4, 40.2], weight: 0.06 },
+    { name: "Bucks", coords: [-75.1, 40.3], weight: 0.05 },
+    { name: "Delaware", coords: [-75.4, 39.9], weight: 0.05 },
+    { name: "Chester", coords: [-75.7, 40.0], weight: 0.04 },
+    { name: "Lancaster", coords: [-76.3, 40.0], weight: 0.04 },
+    { name: "Berks", coords: [-75.9, 40.4], weight: 0.03 },
+    { name: "Lehigh", coords: [-75.6, 40.6], weight: 0.03 },
+    { name: "York", coords: [-76.7, 40.0], weight: 0.03 },
+    { name: "Dauphin", coords: [-76.8, 40.4], weight: 0.03 },
+    { name: "Other Counties", coords: [-77.5, 41.0], weight: 0.40 },
+  ],
+  RI: [
+    { name: "Providence", coords: [-71.5, 41.8], weight: 0.55 },
+    { name: "Kent", coords: [-71.6, 41.7], weight: 0.15 },
+    { name: "Washington", coords: [-71.6, 41.4], weight: 0.12 },
+    { name: "Newport", coords: [-71.3, 41.5], weight: 0.10 },
+    { name: "Bristol", coords: [-71.3, 41.7], weight: 0.08 },
+  ],
+  SC: [
+    { name: "Greenville", coords: [-82.4, 34.9], weight: 0.10 },
+    { name: "Richland", coords: [-81.0, 34.0], weight: 0.08 },
+    { name: "Charleston", coords: [-79.9, 32.8], weight: 0.08 },
+    { name: "Horry", coords: [-78.9, 33.8], weight: 0.07 },
+    { name: "Spartanburg", coords: [-82.0, 34.9], weight: 0.05 },
+    { name: "Lexington", coords: [-81.2, 33.9], weight: 0.05 },
+    { name: "York", coords: [-81.2, 35.0], weight: 0.04 },
+    { name: "Beaufort", coords: [-80.7, 32.4], weight: 0.04 },
+    { name: "Anderson", coords: [-82.6, 34.5], weight: 0.03 },
+    { name: "Berkeley", coords: [-79.9, 33.2], weight: 0.03 },
+    { name: "Other Counties", coords: [-80.5, 34.0], weight: 0.43 },
+  ],
+  SD: [
+    { name: "Minnehaha", coords: [-96.7, 43.7], weight: 0.28 },
+    { name: "Pennington", coords: [-103.0, 44.0], weight: 0.16 },
+    { name: "Lincoln", coords: [-96.7, 43.4], weight: 0.10 },
+    { name: "Brown", coords: [-98.4, 45.6], weight: 0.06 },
+    { name: "Brookings", coords: [-96.8, 44.3], weight: 0.05 },
+    { name: "Other Counties", coords: [-100.3, 44.5], weight: 0.35 },
+  ],
+  TN: [
+    { name: "Shelby", coords: [-90.0, 35.1], weight: 0.14 },
+    { name: "Davidson", coords: [-86.8, 36.2], weight: 0.12 },
+    { name: "Knox", coords: [-83.9, 36.0], weight: 0.07 },
+    { name: "Hamilton", coords: [-85.3, 35.0], weight: 0.06 },
+    { name: "Rutherford", coords: [-86.4, 35.8], weight: 0.05 },
+    { name: "Williamson", coords: [-86.9, 35.9], weight: 0.05 },
+    { name: "Sumner", coords: [-86.5, 36.5], weight: 0.03 },
+    { name: "Montgomery", coords: [-87.4, 36.5], weight: 0.03 },
+    { name: "Wilson", coords: [-86.3, 36.2], weight: 0.03 },
+    { name: "Blount", coords: [-83.9, 35.7], weight: 0.03 },
+    { name: "Other Counties", coords: [-86.0, 35.5], weight: 0.39 },
+  ],
+  TX: [
+    { name: "Harris", coords: [-95.4, 29.8], weight: 0.14 },
+    { name: "Dallas", coords: [-96.8, 32.8], weight: 0.10 },
+    { name: "Tarrant", coords: [-97.3, 32.7], weight: 0.07 },
+    { name: "Bexar", coords: [-98.5, 29.4], weight: 0.07 },
+    { name: "Travis", coords: [-97.7, 30.3], weight: 0.06 },
+    { name: "Collin", coords: [-96.6, 33.2], weight: 0.04 },
+    { name: "Denton", coords: [-97.1, 33.2], weight: 0.04 },
+    { name: "Fort Bend", coords: [-95.8, 29.5], weight: 0.03 },
+    { name: "Williamson", coords: [-97.6, 30.6], weight: 0.03 },
+    { name: "Montgomery", coords: [-95.5, 30.3], weight: 0.03 },
+    { name: "El Paso", coords: [-106.4, 31.8], weight: 0.03 },
+    { name: "Hidalgo", coords: [-98.2, 26.4], weight: 0.03 },
+    { name: "Nueces", coords: [-97.4, 27.8], weight: 0.02 },
+    { name: "Galveston", coords: [-94.8, 29.3], weight: 0.02 },
+    { name: "Other Counties", coords: [-99.5, 33.5], weight: 0.29 },
+  ],
+  UT: [
+    { name: "Salt Lake", coords: [-111.9, 40.7], weight: 0.35 },
+    { name: "Utah", coords: [-111.7, 40.2], weight: 0.18 },
+    { name: "Davis", coords: [-112.0, 41.0], weight: 0.10 },
+    { name: "Weber", coords: [-111.9, 41.2], weight: 0.07 },
+    { name: "Washington", coords: [-113.5, 37.3], weight: 0.06 },
+    { name: "Cache", coords: [-111.7, 41.7], weight: 0.04 },
+    { name: "Other Counties", coords: [-111.5, 39.5], weight: 0.20 },
+  ],
+  VT: [
+    { name: "Chittenden", coords: [-73.1, 44.5], weight: 0.30 },
+    { name: "Rutland", coords: [-73.0, 43.6], weight: 0.12 },
+    { name: "Washington", coords: [-72.6, 44.3], weight: 0.10 },
+    { name: "Windsor", coords: [-72.5, 43.5], weight: 0.10 },
+    { name: "Windham", coords: [-72.7, 43.0], weight: 0.08 },
+    { name: "Other Counties", coords: [-72.7, 44.5], weight: 0.30 },
+  ],
+  VA: [
+    { name: "Fairfax", coords: [-77.3, 38.8], weight: 0.12 },
+    { name: "Virginia Beach", coords: [-76.0, 36.8], weight: 0.08 },
+    { name: "Prince William", coords: [-77.5, 38.7], weight: 0.06 },
+    { name: "Loudoun", coords: [-77.6, 39.1], weight: 0.05 },
+    { name: "Chesterfield", coords: [-77.5, 37.4], weight: 0.04 },
+    { name: "Henrico", coords: [-77.3, 37.6], weight: 0.04 },
+    { name: "Norfolk", coords: [-76.3, 36.8], weight: 0.04 },
+    { name: "Arlington", coords: [-77.1, 38.9], weight: 0.03 },
+    { name: "Richmond City", coords: [-77.4, 37.5], weight: 0.03 },
+    { name: "Chesapeake", coords: [-76.3, 36.7], weight: 0.03 },
+    { name: "Other Counties", coords: [-79.0, 37.5], weight: 0.48 },
+  ],
+  WA: [
+    { name: "King", coords: [-122.1, 47.5], weight: 0.26 },
+    { name: "Pierce", coords: [-122.4, 47.0], weight: 0.10 },
+    { name: "Snohomish", coords: [-122.0, 48.0], weight: 0.08 },
+    { name: "Spokane", coords: [-117.4, 47.7], weight: 0.06 },
+    { name: "Clark", coords: [-122.5, 45.8], weight: 0.05 },
+    { name: "Thurston", coords: [-122.8, 47.0], weight: 0.04 },
+    { name: "Kitsap", coords: [-122.6, 47.6], weight: 0.03 },
+    { name: "Yakima", coords: [-120.5, 46.6], weight: 0.03 },
+    { name: "Other Counties", coords: [-120.5, 47.4], weight: 0.35 },
+  ],
+  WV: [
+    { name: "Kanawha", coords: [-81.6, 38.3], weight: 0.16 },
+    { name: "Berkeley", coords: [-78.0, 39.5], weight: 0.10 },
+    { name: "Cabell", coords: [-82.4, 38.4], weight: 0.08 },
+    { name: "Monongalia", coords: [-79.9, 39.6], weight: 0.08 },
+    { name: "Raleigh", coords: [-81.2, 37.8], weight: 0.06 },
+    { name: "Wood", coords: [-81.5, 39.3], weight: 0.05 },
+    { name: "Putnam", coords: [-82.0, 38.4], weight: 0.05 },
+    { name: "Other Counties", coords: [-80.5, 38.8], weight: 0.42 },
+  ],
+  WI: [
+    { name: "Milwaukee", coords: [-87.9, 43.0], weight: 0.18 },
+    { name: "Dane", coords: [-89.4, 43.1], weight: 0.10 },
+    { name: "Waukesha", coords: [-88.3, 43.0], weight: 0.07 },
+    { name: "Brown", coords: [-88.0, 44.5], weight: 0.05 },
+    { name: "Racine", coords: [-87.8, 42.7], weight: 0.04 },
+    { name: "Outagamie", coords: [-88.5, 44.4], weight: 0.03 },
+    { name: "Winnebago", coords: [-88.6, 44.0], weight: 0.03 },
+    { name: "Kenosha", coords: [-87.8, 42.6], weight: 0.03 },
+    { name: "Rock", coords: [-89.1, 42.7], weight: 0.03 },
+    { name: "Other Counties", coords: [-89.5, 44.5], weight: 0.44 },
+  ],
+  WY: [
+    { name: "Laramie", coords: [-104.8, 41.3], weight: 0.22 },
+    { name: "Natrona", coords: [-106.3, 42.8], weight: 0.14 },
+    { name: "Campbell", coords: [-105.5, 44.2], weight: 0.10 },
+    { name: "Sweetwater", coords: [-109.2, 41.7], weight: 0.08 },
+    { name: "Fremont", coords: [-108.6, 43.0], weight: 0.07 },
+    { name: "Teton", coords: [-110.8, 43.8], weight: 0.06 },
+    { name: "Other Counties", coords: [-107.5, 43.0], weight: 0.33 },
   ],
 }
 
 export function getCountiesForState(stateAbbr: string, totalListings: number): CountyData[] {
   const counties = STATE_COUNTIES[stateAbbr]
-  if (counties) {
-    return counties.map((c) => ({
-      name: c.name,
-      state: stateAbbr,
-      listings: Math.round(totalListings * c.weight),
-      coords: c.coords,
-    }))
-  }
-  // Generic fallback: generate 8-12 plausible counties
-  const seed = stateAbbr.charCodeAt(0) * 100 + stateAbbr.charCodeAt(1)
-  const count = Math.floor(seeded(seed) * 5) + 8
-  const stateInfo = STATE_LISTINGS.find((s) => s.abbr === stateAbbr)
-  if (!stateInfo) return []
-
-  const results: CountyData[] = []
-  let remaining = totalListings
-  for (let i = 0; i < count; i++) {
-    const isLast = i === count - 1
-    const share = isLast ? remaining : Math.round(remaining * (seeded(seed + i * 7) * 0.3 + 0.05))
-    remaining -= share
-    if (remaining < 0) remaining = 0
-    const latJitter = (seeded(seed + i * 13) - 0.5) * 3
-    const lngJitter = (seeded(seed + i * 17) - 0.5) * 3
-    results.push({
-      name: i === count - 1 ? "Other Counties" : `County ${i + 1}`,
-      state: stateAbbr,
-      listings: share,
-      coords: [stateInfo.coords[0] + lngJitter, stateInfo.coords[1] + latJitter],
-    })
-  }
-  return results.sort((a, b) => b.listings - a.listings)
+  if (!counties) return [{ name: stateAbbr, state: stateAbbr, listings: totalListings, coords: [0, 0] }]
+  return counties.map((c) => ({
+    name: c.name,
+    state: stateAbbr,
+    listings: Math.round(totalListings * c.weight),
+    coords: c.coords,
+  }))
 }
 
 // Format large numbers for map labels
@@ -202,12 +648,12 @@ export function formatCount(n: number): string {
 // Color scale for state/county fill based on listing density
 export function getDensityColor(count: number, max: number): string {
   const ratio = count / max
-  if (ratio < 0.05) return "#dbeafe"  // blue-100
-  if (ratio < 0.1) return "#bfdbfe"   // blue-200
-  if (ratio < 0.2) return "#93c5fd"   // blue-300
-  if (ratio < 0.35) return "#60a5fa"  // blue-400
-  if (ratio < 0.5) return "#3b82f6"   // blue-500
-  if (ratio < 0.7) return "#2563eb"   // blue-600
-  if (ratio < 0.85) return "#1d4ed8"  // blue-700
-  return "#1e40af"                     // blue-800
+  if (ratio < 0.05) return "#dbeafe"
+  if (ratio < 0.1) return "#bfdbfe"
+  if (ratio < 0.2) return "#93c5fd"
+  if (ratio < 0.35) return "#60a5fa"
+  if (ratio < 0.5) return "#3b82f6"
+  if (ratio < 0.7) return "#2563eb"
+  if (ratio < 0.85) return "#1d4ed8"
+  return "#1e40af"
 }

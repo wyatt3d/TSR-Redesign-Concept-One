@@ -373,9 +373,11 @@ export default function SearchPage() {
                     {adjustedStates.filter((s) => s.adjustedListings > 5000).map((si) => (
                       <Marker key={si.abbr} coordinates={si.coords}>
                         <text textAnchor="middle" dominantBaseline="middle" style={{
-                          fontFamily: "system-ui", fill: si.adjustedListings > 30000 ? "#fff" : "#1e3a5f",
-                          fontSize: "9px", fontWeight: "bold",
-                          textShadow: si.adjustedListings > 30000 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                          fontFamily: "system-ui",
+                          fill: "#fff",
+                          fontSize: "9px",
+                          fontWeight: "bold",
+                          textShadow: "0 1px 3px rgba(0,0,0,0.6), 0 0px 1px rgba(0,0,0,0.4)",
                           pointerEvents: "none",
                         }}>
                           {formatCount(si.adjustedListings)}
@@ -430,7 +432,8 @@ export default function SearchPage() {
                               onClick={() => handleCountyClick(county)}
                             />
                             <text textAnchor="middle" dominantBaseline="middle" dy={-r - 6} style={{
-                              fontFamily: "system-ui", fill: "#374151", fontSize: "10px", fontWeight: 600, pointerEvents: "none",
+                              fontFamily: "system-ui", fill: "#fff", fontSize: "10px", fontWeight: 600, pointerEvents: "none",
+                              textShadow: "0 1px 3px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)",
                             }}>
                               {county.name}
                             </text>
@@ -438,6 +441,7 @@ export default function SearchPage() {
                               fontFamily: "system-ui", fill: "#fff",
                               fontSize: county.adjustedListings > 10000 ? "10px" : "9px",
                               fontWeight: "bold", pointerEvents: "none",
+                              textShadow: "0 1px 2px rgba(0,0,0,0.5)",
                             }}>
                               {formatCount(county.adjustedListings)}
                             </text>
