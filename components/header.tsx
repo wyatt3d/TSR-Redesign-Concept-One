@@ -40,7 +40,7 @@ export function Header() {
       </div>
 
       <div className="flex items-center gap-1">
-        <nav className="flex items-center">
+        <nav className="flex items-center" data-tutorial="nav">
           {navItems.map((item) => (
             <Link
               key={item.label}
@@ -59,6 +59,7 @@ export function Header() {
         <Link
           href="/onboarding"
           className="p-2 text-gray-600 hover:text-gray-900 hover:bg-gray-100 rounded-md ml-2"
+          data-tutorial="settings"
         >
           <Settings className="w-5 h-5" />
         </Link>

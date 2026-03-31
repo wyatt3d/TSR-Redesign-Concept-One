@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useMemo, useCallback } from "react"
+import { useState, useMemo, useCallback, useEffect } from "react"
 import { Header } from "@/components/header"
 import { MapSidebar } from "@/components/map-sidebar"
 import { ListingCard } from "@/components/listing-card"
@@ -12,6 +12,7 @@ import { STATE_LISTINGS, NATIONAL_TOTAL, getCountiesForState, formatCount, getDe
 import { SOURCES, PROPERTY_TYPES, type SourceId, type PropertyType, type DealType, type Listing } from "@/lib/types"
 import { usePreferences } from "@/hooks/use-preferences"
 import { type ChatAction } from "@/lib/chat-types"
+import { TutorialOverlay } from "@/components/tutorial-overlay"
 import {
   SlidersHorizontal, List, Layers, ZoomIn, ZoomOut, LocateFixed,
   MessageSquare, ArrowUpDown, ExternalLink, Building2, ChevronRight, X,
@@ -33,6 +34,19 @@ const DEAL_LABEL: Record<string, { text: string; cls: string }> = {
 
 export default function SearchPage() {
   const { preferences, loaded } = usePreferences()
+
+  // Tutorial state
+  const [showTutorial, setShowTutorial] = useState(false)
+  useEffect(() => {
+    if (loaded) {
+      const seen = localStorage.getItem("tsr_tutorial_seen")
+      if (!seen) setShowTutorial(true)
+    }
+  }, [loaded])
+  const completeTutorial = useCallback(() => {
+    setShowTutorial(false)
+    localStorage.setItem("tsr_tutorial_seen", "1")
+  }, [])
 
   // View + panel state
   const [viewMode, setViewMode] = useState<ViewMode>("map")
@@ -176,15 +190,53 @@ export default function SearchPage() {
     setCurrentPage(1)
   }
 
-  // Max listings for color scale
-  const maxStateListings = Math.max(...STATE_LISTINGS.map((s) => s.totalListings))
-  const maxCountyListings = countyData.length > 0 ? Math.max(...countyData.map((c) => c.listings)) : 1
+  // ─── Filter-reactive heatmap counts ──────────────────────────
+  // Compute a filter multiplier: what fraction of all possible listings
+  // pass the current source + property type + deal type filters.
+  // This scales the static state/county counts proportionally.
+  const filterMultiplier = useMemo(() => {
+    const totalSources = SOURCES.length
+    const activeSources = selectedSources.length
+    const sourceRatio = activeSources / totalSources
+
+    // Deal type ratio (5 total deal types)
+    const totalDeals = 5
+    const activeDeals = selectedDealTypes.length
+    const dealRatio = activeDeals / totalDeals
+
+    // Property type ratio — if none selected, means "all"
+    const ptRatio = selectedPropertyTypes.length === 0 ? 1 : selectedPropertyTypes.length / 14
+
+    return sourceRatio * dealRatio * ptRatio
+  }, [selectedSources, selectedDealTypes, selectedPropertyTypes])
+
+  // Adjusted state/county data
+  const adjustedStates = useMemo(() =>
+    STATE_LISTINGS.map((s) => ({
+      ...s,
+      adjustedListings: Math.round(s.totalListings * filterMultiplier),
+    })),
+    [filterMultiplier]
+  )
+
+  const adjustedCounties = useMemo(() =>
+    countyData.map((c) => ({
+      ...c,
+      adjustedListings: Math.round(c.listings * filterMultiplier),
+    })),
+    [countyData, filterMultiplier]
+  )
+
+  const maxStateListings = Math.max(...adjustedStates.map((s) => s.adjustedListings), 1)
+  const maxCountyListings = adjustedCounties.length > 0 ? Math.max(...adjustedCounties.map((c) => c.adjustedListings), 1) : 1
+
+  const adjustedNationalTotal = Math.round(NATIONAL_TOTAL * filterMultiplier)
 
   // Display count depends on level
   const displayCount = mapLevel === "national"
-    ? NATIONAL_TOTAL
+    ? adjustedNationalTotal
     : mapLevel === "state"
-    ? STATE_LISTINGS.find((s) => s.abbr === selectedState)?.totalListings ?? 0
+    ? adjustedStates.find((s) => s.abbr === selectedState)?.adjustedListings ?? 0
     : filteredListings.length
 
   if (!loaded) return null
@@ -196,6 +248,7 @@ export default function SearchPage() {
       <div className="flex-1 flex overflow-hidden">
         {/* Left Sidebar */}
         {sidebarOpen && (
+          <div data-tutorial="sidebar">
           <MapSidebar
             selectedSources={selectedSources}
             onToggleSource={toggleSource}
@@ -207,6 +260,7 @@ export default function SearchPage() {
             filteredCount={filteredListings.length}
             onClose={() => setSidebarOpen(false)}
           />
+          </div>
         )}
 
         {/* Center Area */}
@@ -222,7 +276,7 @@ export default function SearchPage() {
               )}
 
               {/* View toggle */}
-              <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden">
+              <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden" data-tutorial="view-toggle">
                 <button onClick={() => setViewMode("map")} className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium transition-colors ${viewMode === "map" ? "bg-[#2a7de1] text-white" : "text-gray-600 hover:text-gray-900"}`}>
                   <Layers className="w-3.5 h-3.5" /> Map
                 </button>
@@ -280,7 +334,7 @@ export default function SearchPage() {
 
           {/* ─── MAP VIEW ──────────────────────────────────── */}
           {viewMode === "map" && (
-            <div className="flex-1 relative">
+            <div className="flex-1 relative" data-tutorial="map-area">
               {/* National level: AlbersUsa choropleth */}
               {mapLevel === "national" && (
                 <div className="w-full h-full">
@@ -296,7 +350,8 @@ export default function SearchPage() {
                         geographies.map((geo) => {
                           const stateName = geo.properties.name
                           const stateInfo = STATE_LISTINGS.find((s) => s.name === stateName)
-                          const count = stateInfo?.totalListings ?? 0
+                          const adj = adjustedStates.find((s) => s.name === stateName)
+                          const count = adj?.adjustedListings ?? 0
                           return (
                             <Geography
                               key={geo.rsmKey}
@@ -315,15 +370,15 @@ export default function SearchPage() {
                         })
                       }
                     </Geographies>
-                    {STATE_LISTINGS.filter((s) => s.totalListings > 10000).map((si) => (
+                    {adjustedStates.filter((s) => s.adjustedListings > 5000).map((si) => (
                       <Marker key={si.abbr} coordinates={si.coords}>
                         <text textAnchor="middle" dominantBaseline="middle" style={{
-                          fontFamily: "system-ui", fill: si.totalListings > 50000 ? "#fff" : "#1e3a5f",
+                          fontFamily: "system-ui", fill: si.adjustedListings > 30000 ? "#fff" : "#1e3a5f",
                           fontSize: "9px", fontWeight: "bold",
-                          textShadow: si.totalListings > 50000 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                          textShadow: si.adjustedListings > 30000 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
                           pointerEvents: "none",
                         }}>
-                          {formatCount(si.totalListings)}
+                          {formatCount(si.adjustedListings)}
                         </text>
                       </Marker>
                     ))}
@@ -361,13 +416,13 @@ export default function SearchPage() {
                           })
                         }
                       </Geographies>
-                      {countyData.map((county) => {
-                        const r = Math.max(8, Math.min(30, Math.sqrt(county.listings / maxCountyListings) * 35))
+                      {adjustedCounties.map((county) => {
+                        const r = Math.max(8, Math.min(30, Math.sqrt(county.adjustedListings / maxCountyListings) * 35))
                         return (
                           <Marker key={county.name} coordinates={county.coords}>
                             <circle
                               r={r}
-                              fill={getDensityColor(county.listings, maxCountyListings)}
+                              fill={getDensityColor(county.adjustedListings, maxCountyListings)}
                               stroke="#fff"
                               strokeWidth={2}
                               opacity={0.85}
@@ -381,10 +436,10 @@ export default function SearchPage() {
                             </text>
                             <text textAnchor="middle" dominantBaseline="middle" style={{
                               fontFamily: "system-ui", fill: "#fff",
-                              fontSize: county.listings > 10000 ? "10px" : "9px",
+                              fontSize: county.adjustedListings > 10000 ? "10px" : "9px",
                               fontWeight: "bold", pointerEvents: "none",
                             }}>
-                              {formatCount(county.listings)}
+                              {formatCount(county.adjustedListings)}
                             </text>
                           </Marker>
                         )
@@ -473,7 +528,7 @@ export default function SearchPage() {
               {/* Level hint */}
               {mapLevel === "national" && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-10 bg-white/90 backdrop-blur-sm rounded-lg shadow border border-gray-200 px-4 py-2 text-xs text-gray-500">
-                  Click a state to drill down &middot; <span className="font-semibold text-gray-700">{formatCount(NATIONAL_TOTAL)}</span> total listings nationwide
+                  Click a state to drill down &middot; <span className="font-semibold text-gray-700">{formatCount(adjustedNationalTotal)}</span> listings match your filters
                 </div>
               )}
               {mapLevel === "state" && (
@@ -572,9 +627,14 @@ export default function SearchPage() {
 
         {/* Chat Panel */}
         {chatOpen && (
+          <div data-tutorial="chat">
           <ChatPanel onAction={handleChatAction} filteredCount={filteredListings.length} totalCount={MOCK_LISTINGS.length} onClose={() => setChatOpen(false)} />
+          </div>
         )}
       </div>
+
+      {/* Tutorial overlay */}
+      {showTutorial && <TutorialOverlay onComplete={completeTutorial} />}
     </div>
   )
 }
