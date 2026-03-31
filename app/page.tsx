@@ -6,7 +6,7 @@ import { MapSidebar } from "@/components/map-sidebar"
 import { ListingCard } from "@/components/listing-card"
 import { SourceBadge } from "@/components/source-badge"
 import { ChatPanel } from "@/components/chat-panel"
-import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps"
+import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "react-simple-maps"
 import { MOCK_LISTINGS } from "@/lib/mock-listings"
 import { STATE_LISTINGS, NATIONAL_TOTAL, getCountiesForState, formatCount, getDensityColor, STATE_FIPS, matchCountyName, type CountyData } from "@/lib/geo-data"
 import { SOURCES, PROPERTY_TYPES, type SourceId, type PropertyType, type DealType, type Listing } from "@/lib/types"
@@ -60,6 +60,16 @@ export default function SearchPage() {
   const [selectedState, setSelectedState] = useState<string | null>(null)
   const [selectedCounty, setSelectedCounty] = useState<string | null>(null)
   const [hoveredCounty, setHoveredCounty] = useState<{ name: string; listings: number } | null>(null)
+
+  // Zoom/pan state for the map
+  const [mapPosition, setMapPosition] = useState<{ coordinates: [number, number]; zoom: number }>({ coordinates: [0, 0], zoom: 1 })
+
+  const handleZoomIn = () => setMapPosition((p) => ({ ...p, zoom: Math.min(p.zoom * 1.5, 20) }))
+  const handleZoomOut = () => setMapPosition((p) => ({ ...p, zoom: Math.max(p.zoom / 1.5, 0.5) }))
+  const handleMoveEnd = (pos: { coordinates: [number, number]; zoom: number }) => setMapPosition(pos)
+
+  // Reset zoom when map level changes
+  useEffect(() => { setMapPosition({ coordinates: [0, 0], zoom: 1 }) }, [mapLevel, selectedState, selectedCounty])
 
   // List view state
   const [sortKey, setSortKey] = useState<SortKey>("daysOnMarket")
@@ -369,11 +379,17 @@ export default function SearchPage() {
                     height={600}
                     style={{ width: "100%", height: "100%" }}
                   >
+                    <ZoomableGroup
+                      center={mapPosition.coordinates}
+                      zoom={mapPosition.zoom}
+                      onMoveEnd={handleMoveEnd}
+                      minZoom={0.5}
+                      maxZoom={20}
+                    >
                     <Geographies geography={statesGeoUrl}>
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const stateName = geo.properties.name
-                          const stateInfo = STATE_LISTINGS.find((s) => s.name === stateName)
                           const adj = adjustedStates.find((s) => s.name === stateName)
                           const count = adj?.adjustedListings ?? 0
                           return (
@@ -408,6 +424,7 @@ export default function SearchPage() {
                         </text>
                       </Marker>
                     ))}
+                    </ZoomableGroup>
                   </ComposableMap>
                 </div>
               )}
@@ -426,6 +443,13 @@ export default function SearchPage() {
                       height={600}
                       style={{ width: "100%", height: "100%" }}
                     >
+                      <ZoomableGroup
+                        center={mapPosition.coordinates}
+                        zoom={mapPosition.zoom}
+                        onMoveEnd={handleMoveEnd}
+                        minZoom={0.5}
+                        maxZoom={20}
+                      >
                       {/* County boundaries */}
                       <Geographies geography={countiesGeoUrl}>
                         {({ geographies }) => {
@@ -488,6 +512,7 @@ export default function SearchPage() {
                           </Marker>
                         ))
                       }
+                      </ZoomableGroup>
                     </ComposableMap>
 
                     {/* Hover tooltip */}
@@ -518,6 +543,13 @@ export default function SearchPage() {
                       height={600}
                       style={{ width: "100%", height: "100%" }}
                     >
+                      <ZoomableGroup
+                        center={mapPosition.coordinates}
+                        zoom={mapPosition.zoom}
+                        onMoveEnd={handleMoveEnd}
+                        minZoom={0.5}
+                        maxZoom={20}
+                      >
                       {/* County boundaries as context */}
                       <Geographies geography={countiesGeoUrl}>
                         {({ geographies }) => {
@@ -548,6 +580,7 @@ export default function SearchPage() {
                           </Marker>
                         )
                       })}
+                      </ZoomableGroup>
                     </ComposableMap>
                   </div>
                 )
@@ -566,10 +599,10 @@ export default function SearchPage() {
 
               {/* Map controls */}
               <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
-                <button className="w-8 h-8 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
+                <button onClick={handleZoomIn} className="w-8 h-8 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
                   <ZoomIn className="w-3.5 h-3.5" />
                 </button>
-                <button className="w-8 h-8 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
+                <button onClick={handleZoomOut} className="w-8 h-8 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
                   <ZoomOut className="w-3.5 h-3.5" />
                 </button>
               </div>
