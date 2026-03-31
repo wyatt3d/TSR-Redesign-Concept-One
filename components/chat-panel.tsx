@@ -70,11 +70,18 @@ export function ChatPanel({ onAction, filteredCount, totalCount, onClose }: Chat
     setInput("")
     setIsTyping(true)
 
-    // Simulate AI response delay
+    // Simulate AI response delay, auto-apply filter commands
+    const userMsgId = userMsg.id
     setTimeout(() => {
       const responses = generateMockResponse(text)
       setMessages((prev) => [...prev, ...responses])
       setIsTyping(false)
+      // Auto-apply any filter commands
+      responses.forEach((r) => {
+        if (r.type === "filter_command" && r.applied) {
+          onAction({ type: "APPLY_FILTERS", filters: r.filters })
+        }
+      })
     }, 800 + Math.random() * 600)
   }
 
@@ -85,11 +92,16 @@ export function ChatPanel({ onAction, filteredCount, totalCount, onClose }: Chat
     }
   }
 
-  const handleApplyFilter = (msg: ChatMessage & { type: "filter_command" }) => {
-    setMessages((prev) =>
-      prev.map((m) => (m.id === msg.id && m.type === "filter_command" ? { ...m, applied: true } : m))
-    )
-    onAction({ type: "APPLY_FILTERS", filters: msg.filters })
+  // Undo: remove the filter response + the user message that triggered it, revert filters
+  const handleUndoFilter = (msg: ChatMessage & { type: "filter_command" }) => {
+    // Find the user message immediately before this response
+    setMessages((prev) => {
+      const idx = prev.findIndex((m) => m.id === msg.id)
+      // Remove the response and the user message before it
+      const userIdx = idx > 0 && prev[idx - 1].role === "user" ? idx - 1 : -1
+      return prev.filter((_, i) => i !== idx && i !== userIdx)
+    })
+    onAction({ type: "UNDO_FILTERS" })
   }
 
   const handleActivateWorkflow = (workflowId: string) => {
@@ -151,7 +163,7 @@ export function ChatPanel({ onAction, filteredCount, totalCount, onClose }: Chat
             {msg.role === "user" ? (
               <UserBubble content={(msg as any).content} />
             ) : (
-              <AssistantMessage msg={msg} onApplyFilter={handleApplyFilter} onActivateWorkflow={handleActivateWorkflow} onAction={onAction} />
+              <AssistantMessage msg={msg} onUndoFilter={handleUndoFilter} onActivateWorkflow={handleActivateWorkflow} onAction={onAction} />
             )}
           </div>
         ))}
@@ -241,12 +253,12 @@ function UserBubble({ content }: { content: string }) {
 
 function AssistantMessage({
   msg,
-  onApplyFilter,
+  onUndoFilter,
   onActivateWorkflow,
   onAction,
 }: {
   msg: ChatMessage
-  onApplyFilter: (msg: ChatMessage & { type: "filter_command" }) => void
+  onUndoFilter: (msg: ChatMessage & { type: "filter_command" }) => void
   onActivateWorkflow: (id: string) => void
   onAction: ChatActionDispatch
 }) {
@@ -254,7 +266,7 @@ function AssistantMessage({
     case "text":
       return <TextCard content={msg.content} />
     case "filter_command":
-      return <FilterCard msg={msg} onApply={() => onApplyFilter(msg)} />
+      return <FilterCard msg={msg} onUndo={() => onUndoFilter(msg)} />
     case "workflow":
       return <WorkflowCard msg={msg} onActivate={() => onActivateWorkflow(msg.workflow.id)} />
     case "insight_card":
@@ -292,17 +304,22 @@ function TextCard({ content }: { content: string }) {
   )
 }
 
-function FilterCard({ msg, onApply }: { msg: ChatMessage & { type: "filter_command" }; onApply: () => void }) {
+function FilterCard({ msg, onUndo }: { msg: ChatMessage & { type: "filter_command" }; onUndo: () => void }) {
   return (
     <div className="max-w-[90%]">
       <div className="border border-blue-200 bg-blue-50/50 rounded-xl overflow-hidden">
-        <div className="flex items-center gap-2 px-3.5 py-2 bg-blue-100/50 border-b border-blue-200">
-          <Zap className="w-3.5 h-3.5 text-[#2a7de1]" />
-          <span className="text-xs font-semibold text-[#2a7de1]">Filter Update</span>
+        <div className="flex items-center justify-between px-3.5 py-2 bg-blue-100/50 border-b border-blue-200">
+          <div className="flex items-center gap-2">
+            <Zap className="w-3.5 h-3.5 text-[#2a7de1]" />
+            <span className="text-xs font-semibold text-[#2a7de1]">Filters Applied</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-[11px] text-green-600 font-medium">
+            <CheckCircle2 className="w-3 h-3" />
+            Active
+          </div>
         </div>
         <div className="px-3.5 py-3">
           <p className="text-sm text-gray-700 mb-2.5">{msg.content}</p>
-          {/* Show filter changes */}
           <div className="flex flex-wrap gap-1.5 mb-3">
             {msg.filters.states?.map((s) => (
               <span key={s} className="px-2 py-0.5 bg-blue-100 text-[#2a7de1] text-[11px] font-medium rounded">State: {s}</span>
@@ -319,28 +336,18 @@ function FilterCard({ msg, onApply }: { msg: ChatMessage & { type: "filter_comma
               </span>
             )}
           </div>
-          <div className="text-xs text-gray-500 mb-3">
-            <span className="font-semibold text-gray-700">{msg.resultCount}</span> listings match
+          <div className="flex items-center justify-between">
+            <div className="text-xs text-gray-500">
+              <span className="font-semibold text-gray-700">{msg.resultCount}</span> listings match
+            </div>
+            <button
+              onClick={onUndo}
+              className="flex items-center gap-1 px-3 py-1.5 border border-gray-300 text-xs text-gray-600 font-medium rounded-lg hover:bg-gray-100 hover:text-gray-900 transition-colors"
+            >
+              <RotateCcw className="w-3 h-3" />
+              Undo
+            </button>
           </div>
-          {msg.applied ? (
-            <div className="flex items-center gap-1.5 text-xs text-green-600 font-medium">
-              <CheckCircle2 className="w-3.5 h-3.5" />
-              Filters applied
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <button
-                onClick={onApply}
-                className="flex items-center gap-1 px-3 py-1.5 bg-[#2a7de1] text-white text-xs font-medium rounded-lg hover:bg-[#2268c4] transition-colors"
-              >
-                <CheckCircle2 className="w-3 h-3" />
-                Apply Filters
-              </button>
-              <button className="px-3 py-1.5 border border-gray-200 text-xs text-gray-600 font-medium rounded-lg hover:bg-gray-50">
-                Edit
-              </button>
-            </div>
-          )}
         </div>
       </div>
     </div>

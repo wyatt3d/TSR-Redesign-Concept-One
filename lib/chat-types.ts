@@ -132,7 +132,7 @@ export function generateMockResponse(userPrompt: string): ChatMessage[] {
         content: `Filtered to ${lower.includes("florida") ? "Florida " : ""}tax foreclosures${lower.includes("under") ? " under $1M" : ""}. Here's what matches your criteria.`,
         filters,
         resultCount: 23,
-        applied: false,
+        applied: true,
       })
     } else if (lower.includes("multifamily") || lower.includes("industrial")) {
       const types: PropertyType[] = []
@@ -144,7 +144,7 @@ export function generateMockResponse(userPrompt: string): ChatMessage[] {
         content: `Filtered to ${types.join(" & ")} properties across all active sources.`,
         filters: { propertyTypes: types },
         resultCount: 45,
-        applied: false,
+        applied: true,
       })
     } else {
       msgs.push({
@@ -152,7 +152,7 @@ export function generateMockResponse(userPrompt: string): ChatMessage[] {
         content: "Updated your filters based on that request.",
         filters: {},
         resultCount: 87,
-        applied: false,
+        applied: true,
       })
     }
     return msgs
