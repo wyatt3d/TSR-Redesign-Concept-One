@@ -71,6 +71,14 @@ export default function SearchPage() {
   // Reset zoom when map level changes
   useEffect(() => { setMapPosition({ coordinates: [0, 0], zoom: 1 }) }, [mapLevel, selectedState, selectedCounty])
 
+  // Allow left click, middle mouse, and scroll wheel for zoom/pan (default blocks middle mouse)
+  const filterZoom = useCallback((evt: any) => {
+    // Allow wheel events (zoom) and any mouse button for pan (0=left, 1=middle)
+    if (evt.type === "wheel") return true
+    if (evt.type === "mousedown" || evt.type === "mousemove") return !evt.ctrlKey
+    return !evt.ctrlKey && !evt.button
+  }, [])
+
   // List view state
   const [sortKey, setSortKey] = useState<SortKey>("daysOnMarket")
   const [sortAsc, setSortAsc] = useState(true)
@@ -447,6 +455,7 @@ export default function SearchPage() {
                         center={mapPosition.coordinates}
                         zoom={mapPosition.zoom}
                         onMoveEnd={handleMoveEnd}
+                        filterZoomEvent={filterZoom}
                         minZoom={0.5}
                         maxZoom={20}
                       >
@@ -547,6 +556,7 @@ export default function SearchPage() {
                         center={mapPosition.coordinates}
                         zoom={mapPosition.zoom}
                         onMoveEnd={handleMoveEnd}
+                        filterZoomEvent={filterZoom}
                         minZoom={0.5}
                         maxZoom={20}
                       >
