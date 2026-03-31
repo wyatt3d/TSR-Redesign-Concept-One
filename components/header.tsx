@@ -7,9 +7,7 @@ import { ChevronDown, Grid3X3, Settings } from "lucide-react"
 
 const navItems = [
   { label: "Auctions", href: "/" },
-  { label: "Listings", href: "/listings" },
   { label: "Dashboard", href: "/dashboard" },
-  { label: "Search", href: "/search" },
   { label: "Alerts", href: "/alerts" },
 ]
 
@@ -17,10 +15,8 @@ export function Header() {
   const pathname = usePathname()
 
   const getActiveItem = () => {
-    if (pathname === "/") return "Auctions"
-    if (pathname.startsWith("/listings")) return "Listings"
+    if (pathname === "/" ) return "Auctions"
     if (pathname.startsWith("/dashboard")) return "Dashboard"
-    if (pathname.startsWith("/search")) return "Search"
     if (pathname.startsWith("/alerts")) return "Alerts"
     return "Auctions"
   }

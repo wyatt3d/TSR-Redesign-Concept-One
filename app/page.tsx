@@ -4,23 +4,45 @@ import { useState, useMemo, useCallback } from "react"
 import { Header } from "@/components/header"
 import { MapSidebar } from "@/components/map-sidebar"
 import { ListingCard } from "@/components/listing-card"
+import { SourceBadge } from "@/components/source-badge"
 import { ChatPanel } from "@/components/chat-panel"
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps"
 import { MOCK_LISTINGS } from "@/lib/mock-listings"
-import { SOURCES, type SourceId, type PropertyType, type DealType, type Listing } from "@/lib/types"
+import { SOURCES, PROPERTY_TYPES, type SourceId, type PropertyType, type DealType, type Listing } from "@/lib/types"
 import { usePreferences } from "@/hooks/use-preferences"
 import { type ChatAction } from "@/lib/chat-types"
-import { SlidersHorizontal, List, Layers, ZoomIn, ZoomOut, LocateFixed, Sparkles, MessageSquare } from "lucide-react"
+import {
+  SlidersHorizontal, List, Layers, ZoomIn, ZoomOut, LocateFixed,
+  MessageSquare, ArrowUpDown, ExternalLink, Building2,
+} from "lucide-react"
 
 const geoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
 
-export default function MapPortalPage() {
+type ViewMode = "map" | "list"
+type SortKey = "price" | "daysOnMarket" | "capRate" | "sqft" | "city"
+
+const DEAL_LABEL: Record<string, { text: string; cls: string }> = {
+  for_sale: { text: "For Sale", cls: "bg-blue-50 text-blue-700" },
+  for_lease: { text: "Lease", cls: "bg-purple-50 text-purple-700" },
+  auction: { text: "Auction", cls: "bg-red-50 text-red-700" },
+  foreclosure: { text: "Foreclosure", cls: "bg-red-50 text-red-700" },
+  reo: { text: "REO", cls: "bg-orange-50 text-orange-700" },
+}
+
+export default function AuctionsPage() {
   const { preferences, loaded } = usePreferences()
 
-  // Panel visibility
+  // View + panel state
+  const [viewMode, setViewMode] = useState<ViewMode>("map")
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [chatOpen, setChatOpen] = useState(true)
   const [selectedListing, setSelectedListing] = useState<Listing | null>(null)
+
+  // List view state
+  const [sortKey, setSortKey] = useState<SortKey>("daysOnMarket")
+  const [sortAsc, setSortAsc] = useState(true)
+  const [currentPage, setCurrentPage] = useState(1)
+  const perPage = 50
 
   // Filter state
   const [selectedSources, setSelectedSources] = useState<SourceId[]>(
@@ -32,42 +54,32 @@ export default function MapPortalPage() {
   const [selectedDealTypes, setSelectedDealTypes] = useState<DealType[]>(
     () => preferences.dealTypes.length > 0 ? preferences.dealTypes : ["for_sale", "for_lease", "auction", "foreclosure", "reo"]
   )
-
-  // Previous filter state for undo
   const [prevFilters, setPrevFilters] = useState<{
-    sources: SourceId[]
-    propertyTypes: PropertyType[]
-    dealTypes: DealType[]
+    sources: SourceId[]; propertyTypes: PropertyType[]; dealTypes: DealType[]
   } | null>(null)
 
   const toggleSource = (id: SourceId) => {
     setSelectedSources((prev) => prev.includes(id) ? prev.filter((s) => s !== id) : [...prev, id])
+    setCurrentPage(1)
   }
   const togglePropertyType = (id: PropertyType) => {
     setSelectedPropertyTypes((prev) => prev.includes(id) ? prev.filter((p) => p !== id) : [...prev, id])
+    setCurrentPage(1)
   }
   const toggleDealType = (id: DealType) => {
     setSelectedDealTypes((prev) => prev.includes(id) ? prev.filter((d) => d !== id) : [...prev, id])
+    setCurrentPage(1)
   }
 
-  // Chat action handler — applies filter changes from chat
   const handleChatAction = useCallback((action: ChatAction) => {
     switch (action.type) {
       case "APPLY_FILTERS": {
-        // Save current state for undo
-        setPrevFilters({
-          sources: selectedSources,
-          propertyTypes: selectedPropertyTypes,
-          dealTypes: selectedDealTypes,
-        })
+        setPrevFilters({ sources: selectedSources, propertyTypes: selectedPropertyTypes, dealTypes: selectedDealTypes })
         const f = action.filters
         if (f.sources) setSelectedSources(f.sources)
         if (f.propertyTypes) setSelectedPropertyTypes(f.propertyTypes)
         if (f.dealTypes) setSelectedDealTypes(f.dealTypes)
-        if (f.states) {
-          // Filter sources to only those with listings in the specified states
-          // For prototype, we filter the listing results rather than modifying sources
-        }
+        setCurrentPage(1)
         break
       }
       case "UNDO_FILTERS": {
@@ -76,12 +88,14 @@ export default function MapPortalPage() {
           setSelectedPropertyTypes(prevFilters.propertyTypes)
           setSelectedDealTypes(prevFilters.dealTypes)
           setPrevFilters(null)
+          setCurrentPage(1)
         }
         break
       }
     }
   }, [selectedSources, selectedPropertyTypes, selectedDealTypes, prevFilters])
 
+  // ─── Derived data ───────────────────────────────────────────────
   const filteredListings = useMemo(() => {
     return MOCK_LISTINGS.filter((l) => {
       if (!selectedSources.includes(l.source)) return false
@@ -91,15 +105,39 @@ export default function MapPortalPage() {
     })
   }, [selectedSources, selectedPropertyTypes, selectedDealTypes])
 
+  const sortedListings = useMemo(() => {
+    const items = [...filteredListings]
+    items.sort((a, b) => {
+      let av: number, bv: number
+      switch (sortKey) {
+        case "price": av = a.price ?? 0; bv = b.price ?? 0; break
+        case "daysOnMarket": av = a.daysOnMarket; bv = b.daysOnMarket; break
+        case "capRate": av = a.capRate ?? 0; bv = b.capRate ?? 0; break
+        case "sqft": av = a.sqft ?? 0; bv = b.sqft ?? 0; break
+        case "city": return sortAsc ? a.city.localeCompare(b.city) : b.city.localeCompare(a.city)
+        default: av = 0; bv = 0
+      }
+      return sortAsc ? av - bv : bv - av
+    })
+    return items
+  }, [filteredListings, sortKey, sortAsc])
+
+  const totalPages = Math.ceil(sortedListings.length / perPage)
+  const pagedListings = sortedListings.slice((currentPage - 1) * perPage, currentPage * perPage)
+
   const sourceCounts = useMemo(() => {
     const counts: Partial<Record<SourceId, number>> = {}
-    filteredListings.forEach((l) => {
-      counts[l.source] = (counts[l.source] || 0) + 1
-    })
+    filteredListings.forEach((l) => { counts[l.source] = (counts[l.source] || 0) + 1 })
     return counts
   }, [filteredListings])
 
   const activeSourceIds = Object.keys(sourceCounts) as SourceId[]
+
+  const toggleSort = (key: SortKey) => {
+    if (sortKey === key) setSortAsc(!sortAsc)
+    else { setSortKey(key); setSortAsc(true) }
+    setCurrentPage(1)
+  }
 
   if (!loaded) return null
 
@@ -123,127 +161,248 @@ export default function MapPortalPage() {
           />
         )}
 
-        {/* Map Area */}
-        <div className="flex-1 relative bg-[#f0f4f8]">
-          {/* Toggle sidebar button */}
-          {!sidebarOpen && (
-            <button
-              onClick={() => setSidebarOpen(true)}
-              className="absolute top-4 left-4 z-10 flex items-center gap-1.5 px-3 py-2 bg-white rounded-lg shadow-md border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50"
-            >
-              <SlidersHorizontal className="w-4 h-4" />
-              Filters
-              <span className="text-xs text-gray-400 ml-1">{filteredListings.length}</span>
-            </button>
-          )}
+        {/* Center Area — Map or List */}
+        <div className="flex-1 relative flex flex-col overflow-hidden bg-[#f0f4f8]">
 
-          {/* Map controls */}
-          <div className="absolute top-4 right-4 z-10 flex flex-col gap-1.5">
-            <button className="w-9 h-9 bg-white rounded-lg shadow-md border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50">
-              <ZoomIn className="w-4 h-4" />
-            </button>
-            <button className="w-9 h-9 bg-white rounded-lg shadow-md border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50">
-              <ZoomOut className="w-4 h-4" />
-            </button>
-            <button className="w-9 h-9 bg-white rounded-lg shadow-md border border-gray-200 flex items-center justify-center text-gray-600 hover:bg-gray-50">
-              <LocateFixed className="w-4 h-4" />
-            </button>
-          </div>
+          {/* Toolbar row — always visible */}
+          <div className="flex items-center justify-between px-4 py-2 bg-white border-b border-gray-200 z-10 flex-shrink-0">
+            <div className="flex items-center gap-2">
+              {/* Sidebar toggle (when collapsed) */}
+              {!sidebarOpen && (
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-1.5 border border-gray-200 rounded-lg text-sm font-medium text-gray-700 hover:bg-gray-50"
+                >
+                  <SlidersHorizontal className="w-3.5 h-3.5" />
+                  Filters
+                </button>
+              )}
 
-          {/* View toggle */}
-          <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 flex items-center bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
-            <button className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium bg-[#2a7de1] text-white">
-              <Layers className="w-3.5 h-3.5" />
-              Map
-            </button>
-            <a href="/listings" className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50">
-              <List className="w-3.5 h-3.5" />
-              List
-            </a>
-          </div>
+              {/* View toggle */}
+              <div className="flex items-center bg-gray-100 rounded-lg overflow-hidden">
+                <button
+                  onClick={() => setViewMode("map")}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                    viewMode === "map" ? "bg-[#2a7de1] text-white" : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <Layers className="w-3.5 h-3.5" />
+                  Map
+                </button>
+                <button
+                  onClick={() => { setViewMode("list"); setCurrentPage(1) }}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 text-xs font-medium transition-colors ${
+                    viewMode === "list" ? "bg-[#2a7de1] text-white" : "text-gray-600 hover:text-gray-900"
+                  }`}
+                >
+                  <List className="w-3.5 h-3.5" />
+                  List
+                </button>
+              </div>
 
-          {/* The Map */}
-          <div className="w-full h-full">
-            <ComposableMap
-              projection="geoAlbersUsa"
-              projectionConfig={{ scale: 1100 }}
-              width={960}
-              height={600}
-              style={{ width: "100%", height: "100%" }}
-            >
-              <Geographies geography={geoUrl}>
-                {({ geographies }) =>
-                  geographies.map((geo) => (
-                    <Geography
-                      key={geo.rsmKey}
-                      geography={geo}
-                      fill="#e8ecf1"
-                      stroke="#fff"
-                      strokeWidth={0.75}
-                      style={{
-                        default: { outline: "none" },
-                        hover: { outline: "none", fill: "#dde3eb" },
-                        pressed: { outline: "none" },
-                      }}
-                    />
-                  ))
-                }
-              </Geographies>
+              {/* Result count */}
+              <span className="text-xs text-gray-500 ml-1">
+                <span className="font-semibold text-gray-700">{filteredListings.length.toLocaleString()}</span> listings
+              </span>
+            </div>
 
-              {/* Listing markers */}
-              {filteredListings.map((listing) => {
-                const source = SOURCES.find((s) => s.id === listing.source)
-                if (!source) return null
+            {/* Right side: source dots summary */}
+            <div className="flex items-center gap-2.5 overflow-x-auto">
+              {activeSourceIds.slice(0, 8).map((sid) => {
+                const src = SOURCES.find((s) => s.id === sid)
+                if (!src) return null
                 return (
-                  <Marker
-                    key={listing.id}
-                    coordinates={[listing.lng, listing.lat]}
-                    onClick={() => setSelectedListing(listing)}
-                  >
-                    <circle
-                      r={3.5}
-                      fill={source.color}
-                      stroke="#fff"
-                      strokeWidth={1}
-                      style={{ cursor: "pointer" }}
-                      opacity={0.85}
-                    />
-                  </Marker>
+                  <div key={sid} className="flex items-center gap-1 flex-shrink-0">
+                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: src.color }} />
+                    <span className="text-[10px] text-gray-500 font-medium">{src.shortName} {sourceCounts[sid]}</span>
+                  </div>
                 )
               })}
-            </ComposableMap>
-          </div>
-
-          {/* Source legend bar */}
-          <div className="absolute bottom-4 left-4 right-4 z-10">
-            <div className="bg-white/95 backdrop-blur-sm rounded-xl shadow-lg border border-gray-200 px-4 py-2.5 flex items-center gap-4 overflow-x-auto">
-              <span className="text-xs font-semibold text-gray-500 flex-shrink-0 uppercase tracking-wide">
-                {filteredListings.length.toLocaleString()} listings
-              </span>
-              <div className="w-px h-5 bg-gray-200 flex-shrink-0" />
-              <div className="flex items-center gap-3 overflow-x-auto">
-                {activeSourceIds.slice(0, 12).map((sourceId) => {
-                  const source = SOURCES.find((s) => s.id === sourceId)
-                  if (!source) return null
-                  return (
-                    <div key={sourceId} className="flex items-center gap-1.5 flex-shrink-0">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: source.color }} />
-                      <span className="text-[11px] text-gray-600 font-medium">{source.shortName}</span>
-                      <span className="text-[11px] text-gray-400">{sourceCounts[sourceId]}</span>
-                    </div>
-                  )
-                })}
-                {activeSourceIds.length > 12 && (
-                  <span className="text-[11px] text-gray-400 flex-shrink-0">+{activeSourceIds.length - 12} more</span>
-                )}
-              </div>
+              {activeSourceIds.length > 8 && (
+                <span className="text-[10px] text-gray-400 flex-shrink-0">+{activeSourceIds.length - 8}</span>
+              )}
             </div>
           </div>
 
-          {/* Selected listing card */}
-          {selectedListing && (
-            <div className="absolute top-20 right-16 z-20">
-              <ListingCard listing={selectedListing} onClose={() => setSelectedListing(null)} />
+          {/* ─── MAP VIEW ──────────────────────────────────────── */}
+          {viewMode === "map" && (
+            <div className="flex-1 relative">
+              {/* Map controls */}
+              <div className="absolute top-3 right-3 z-10 flex flex-col gap-1.5">
+                <button className="w-8 h-8 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
+                  <ZoomIn className="w-3.5 h-3.5" />
+                </button>
+                <button className="w-8 h-8 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
+                  <ZoomOut className="w-3.5 h-3.5" />
+                </button>
+                <button className="w-8 h-8 bg-white rounded-lg shadow border border-gray-200 flex items-center justify-center text-gray-500 hover:bg-gray-50">
+                  <LocateFixed className="w-3.5 h-3.5" />
+                </button>
+              </div>
+
+              <div className="w-full h-full">
+                <ComposableMap
+                  projection="geoAlbersUsa"
+                  projectionConfig={{ scale: 1100 }}
+                  width={960}
+                  height={600}
+                  style={{ width: "100%", height: "100%" }}
+                >
+                  <Geographies geography={geoUrl}>
+                    {({ geographies }) =>
+                      geographies.map((geo) => (
+                        <Geography
+                          key={geo.rsmKey}
+                          geography={geo}
+                          fill="#e8ecf1"
+                          stroke="#fff"
+                          strokeWidth={0.75}
+                          style={{
+                            default: { outline: "none" },
+                            hover: { outline: "none", fill: "#dde3eb" },
+                            pressed: { outline: "none" },
+                          }}
+                        />
+                      ))
+                    }
+                  </Geographies>
+                  {filteredListings.map((listing) => {
+                    const source = SOURCES.find((s) => s.id === listing.source)
+                    if (!source) return null
+                    return (
+                      <Marker key={listing.id} coordinates={[listing.lng, listing.lat]} onClick={() => setSelectedListing(listing)}>
+                        <circle r={3.5} fill={source.color} stroke="#fff" strokeWidth={1} style={{ cursor: "pointer" }} opacity={0.85} />
+                      </Marker>
+                    )
+                  })}
+                </ComposableMap>
+              </div>
+
+              {/* Selected listing card */}
+              {selectedListing && (
+                <div className="absolute top-16 right-14 z-20">
+                  <ListingCard listing={selectedListing} onClose={() => setSelectedListing(null)} />
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── LIST VIEW ─────────────────────────────────────── */}
+          {viewMode === "list" && (
+            <div className="flex-1 flex flex-col overflow-hidden bg-white">
+              <div className="flex-1 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="border-b border-gray-200 bg-gray-50">
+                      <th className="py-2.5 px-4 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Source</th>
+                      <th className="py-2.5 px-4 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                        <button onClick={() => toggleSort("city")} className="flex items-center gap-1 hover:text-gray-700">
+                          Property <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="py-2.5 px-4 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Type</th>
+                      <th className="py-2.5 px-4 text-left text-[11px] font-semibold text-gray-500 uppercase tracking-wide">Deal</th>
+                      <th className="py-2.5 px-4 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                        <button onClick={() => toggleSort("price")} className="flex items-center gap-1 ml-auto hover:text-gray-700">
+                          Price <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="py-2.5 px-4 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                        <button onClick={() => toggleSort("capRate")} className="flex items-center gap-1 ml-auto hover:text-gray-700">
+                          Cap <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="py-2.5 px-4 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                        <button onClick={() => toggleSort("sqft")} className="flex items-center gap-1 ml-auto hover:text-gray-700">
+                          SF <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="py-2.5 px-4 text-right text-[11px] font-semibold text-gray-500 uppercase tracking-wide">
+                        <button onClick={() => toggleSort("daysOnMarket")} className="flex items-center gap-1 ml-auto hover:text-gray-700">
+                          DOM <ArrowUpDown className="w-3 h-3" />
+                        </button>
+                      </th>
+                      <th className="py-2.5 px-4 w-10"></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {pagedListings.map((listing) => {
+                      const pt = PROPERTY_TYPES.find((p) => p.id === listing.propertyType)
+                      const dl = DEAL_LABEL[listing.dealType]
+                      return (
+                        <tr key={listing.id} className="border-b border-gray-50 hover:bg-blue-50/30 transition-colors cursor-pointer" onClick={() => setSelectedListing(listing)}>
+                          <td className="py-2.5 px-4"><SourceBadge sourceId={listing.source} size="xs" /></td>
+                          <td className="py-2.5 px-4">
+                            <div className="font-medium text-gray-900 text-sm leading-tight">{listing.address}</div>
+                            <div className="text-[11px] text-gray-500">{listing.city}, {listing.state} {listing.zip}</div>
+                          </td>
+                          <td className="py-2.5 px-4 text-xs text-gray-600">{pt?.label}</td>
+                          <td className="py-2.5 px-4">
+                            <span className={`text-[10px] font-semibold px-2 py-0.5 rounded ${dl.cls}`}>{dl.text}</span>
+                          </td>
+                          <td className="py-2.5 px-4 text-right font-semibold text-gray-900 text-sm">{listing.priceLabel}</td>
+                          <td className="py-2.5 px-4 text-right">
+                            {listing.capRate ? (
+                              <span className="text-green-600 font-medium text-sm">{listing.capRate}%</span>
+                            ) : (
+                              <span className="text-gray-300">&mdash;</span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-4 text-right text-sm text-gray-600">
+                            {listing.sqft ? listing.sqft.toLocaleString() : <span className="text-gray-300">&mdash;</span>}
+                          </td>
+                          <td className="py-2.5 px-4 text-right">
+                            <span className={`text-sm ${listing.daysOnMarket < 7 ? "text-green-600 font-medium" : "text-gray-500"}`}>
+                              {listing.daysOnMarket}d
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-4 text-center">
+                            <button onClick={(e) => { e.stopPropagation() }} className="p-1 text-gray-400 hover:text-[#2a7de1]">
+                              <ExternalLink className="w-3.5 h-3.5" />
+                            </button>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+
+              {/* Pagination */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-t border-gray-200 bg-white flex-shrink-0">
+                <div className="text-xs text-gray-500">
+                  <span className="font-medium text-gray-700">{(currentPage - 1) * perPage + 1}&ndash;{Math.min(currentPage * perPage, sortedListings.length)}</span> of{" "}
+                  <span className="font-medium text-gray-700">{sortedListings.length.toLocaleString()}</span>
+                </div>
+                <div className="flex items-center gap-0.5">
+                  <button
+                    disabled={currentPage === 1}
+                    onClick={() => setCurrentPage((p) => p - 1)}
+                    className="px-2.5 py-1 text-xs text-[#2a7de1] hover:bg-gray-50 rounded disabled:opacity-30"
+                  >
+                    Prev
+                  </button>
+                  {Array.from({ length: Math.min(7, totalPages) }, (_, i) => i + 1).map((page) => (
+                    <button
+                      key={page}
+                      onClick={() => setCurrentPage(page)}
+                      className={`w-7 h-7 flex items-center justify-center rounded text-xs ${
+                        currentPage === page ? "bg-[#2a7de1] text-white" : "text-[#2a7de1] hover:bg-gray-50"
+                      }`}
+                    >
+                      {page}
+                    </button>
+                  ))}
+                  {totalPages > 7 && <span className="px-1 text-gray-400 text-xs">...</span>}
+                  <button
+                    disabled={currentPage === totalPages}
+                    onClick={() => setCurrentPage((p) => p + 1)}
+                    className="px-2.5 py-1 text-xs text-[#2a7de1] hover:bg-gray-50 rounded disabled:opacity-30"
+                  >
+                    Next
+                  </button>
+                </div>
+              </div>
             </div>
           )}
 
@@ -251,7 +410,7 @@ export default function MapPortalPage() {
           {!chatOpen && (
             <button
               onClick={() => setChatOpen(true)}
-              className="absolute bottom-20 right-4 z-10 w-12 h-12 bg-[#2a7de1] text-white rounded-full shadow-lg hover:bg-[#2268c4] flex items-center justify-center transition-all hover:scale-105"
+              className="absolute bottom-6 right-4 z-10 w-12 h-12 bg-[#2a7de1] text-white rounded-full shadow-lg hover:bg-[#2268c4] flex items-center justify-center transition-all hover:scale-105"
             >
               <MessageSquare className="w-5 h-5" />
             </button>
