@@ -8,7 +8,7 @@ import { SourceBadge } from "@/components/source-badge"
 import { ChatPanel } from "@/components/chat-panel"
 import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps"
 import { MOCK_LISTINGS } from "@/lib/mock-listings"
-import { STATE_LISTINGS, NATIONAL_TOTAL, getCountiesForState, formatCount, getDensityColor, type CountyData } from "@/lib/geo-data"
+import { STATE_LISTINGS, NATIONAL_TOTAL, getCountiesForState, formatCount, getDensityColor, STATE_FIPS, matchCountyName, type CountyData } from "@/lib/geo-data"
 import { SOURCES, PROPERTY_TYPES, type SourceId, type PropertyType, type DealType, type Listing } from "@/lib/types"
 import { usePreferences } from "@/hooks/use-preferences"
 import { type ChatAction } from "@/lib/chat-types"
@@ -18,7 +18,8 @@ import {
   MessageSquare, ArrowUpDown, ExternalLink, Building2, ChevronRight, X,
 } from "lucide-react"
 
-const geoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
+const statesGeoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
+const countiesGeoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/counties-10m.json"
 
 type ViewMode = "map" | "list"
 type MapLevel = "national" | "state" | "county"
@@ -58,6 +59,7 @@ export default function SearchPage() {
   const [mapLevel, setMapLevel] = useState<MapLevel>("national")
   const [selectedState, setSelectedState] = useState<string | null>(null)
   const [selectedCounty, setSelectedCounty] = useState<string | null>(null)
+  const [hoveredCounty, setHoveredCounty] = useState<{ name: string; listings: number } | null>(null)
 
   // List view state
   const [sortKey, setSortKey] = useState<SortKey>("daysOnMarket")
@@ -345,7 +347,7 @@ export default function SearchPage() {
                     height={600}
                     style={{ width: "100%", height: "100%" }}
                   >
-                    <Geographies geography={geoUrl}>
+                    <Geographies geography={statesGeoUrl}>
                       {({ geographies }) =>
                         geographies.map((geo) => {
                           const stateName = geo.properties.name
@@ -388,10 +390,11 @@ export default function SearchPage() {
                 </div>
               )}
 
-              {/* State level: Mercator zoomed to state, county bubbles */}
+              {/* State level: county boundary polygons from census data */}
               {mapLevel === "state" && (() => {
                 const si = STATE_LISTINGS.find((s) => s.abbr === selectedState)
                 if (!si) return null
+                const fips = STATE_FIPS[si.abbr]
                 return (
                   <div className="w-full h-full">
                     <ComposableMap
@@ -401,66 +404,89 @@ export default function SearchPage() {
                       height={600}
                       style={{ width: "100%", height: "100%" }}
                     >
-                      <Geographies geography={geoUrl}>
-                        {({ geographies }) =>
-                          geographies.map((geo) => {
-                            const isThis = geo.properties.name === si.name
+                      {/* County boundaries */}
+                      <Geographies geography={countiesGeoUrl}>
+                        {({ geographies }) => {
+                          // Filter to counties in this state (FIPS prefix)
+                          const stateCounties = geographies.filter(
+                            (geo) => String(geo.id).padStart(5, "0").startsWith(fips)
+                          )
+                          return stateCounties.map((geo) => {
+                            const countyName = geo.properties.name
+                            const matched = matchCountyName(countyName, adjustedCounties)
+                            const listings = matched?.adjustedListings ?? 0
+                            // Unmatched counties get a share of "Other Counties"
+                            const otherCounty = adjustedCounties.find((c) =>
+                              c.name.startsWith("Other")
+                            )
+                            const displayCount = listings > 0 ? listings : Math.round((otherCounty?.adjustedListings ?? 0) / 20)
+                            const fillColor = displayCount > 0 ? getDensityColor(displayCount, maxCountyListings) : "#e5e7eb"
+
                             return (
                               <Geography
                                 key={geo.rsmKey}
                                 geography={geo}
-                                fill={isThis ? "#dbeafe" : "#f3f4f6"}
-                                stroke={isThis ? "#93c5fd" : "#d1d5db"}
-                                strokeWidth={isThis ? 1.5 : 0.5}
-                                style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }}
+                                fill={fillColor}
+                                stroke="#fff"
+                                strokeWidth={0.5}
+                                onClick={() => {
+                                  const cd: CountyData = matched ?? {
+                                    name: countyName,
+                                    state: si.abbr,
+                                    listings: displayCount,
+                                    coords: si.center,
+                                  }
+                                  handleCountyClick(cd)
+                                }}
+                                onMouseEnter={() => setHoveredCounty({ name: countyName, listings: displayCount })}
+                                onMouseLeave={() => setHoveredCounty(null)}
+                                style={{
+                                  default: { outline: "none", cursor: "pointer" },
+                                  hover: { outline: "none", fill: "#1e40af", cursor: "pointer" },
+                                  pressed: { outline: "none" },
+                                }}
                               />
                             )
                           })
-                        }
+                        }}
                       </Geographies>
-                      {adjustedCounties.map((county) => {
-                        const r = Math.max(8, Math.min(30, Math.sqrt(county.adjustedListings / maxCountyListings) * 35))
-                        return (
+
+                      {/* County count labels for major counties */}
+                      {adjustedCounties
+                        .filter((c) => !c.name.startsWith("Other") && c.adjustedListings > 0)
+                        .map((county) => (
                           <Marker key={county.name} coordinates={county.coords}>
-                            <circle
-                              r={r}
-                              fill={getDensityColor(county.adjustedListings, maxCountyListings)}
-                              stroke="#fff"
-                              strokeWidth={2}
-                              opacity={0.85}
-                              style={{ cursor: "pointer" }}
-                              onClick={() => handleCountyClick(county)}
-                            />
-                            <text textAnchor="middle" dominantBaseline="middle" dy={-r - 6} style={{
-                              fontFamily: "system-ui", fill: "#fff", fontSize: "10px", fontWeight: 600, pointerEvents: "none",
-                              textShadow: "0 1px 3px rgba(0,0,0,0.7), 0 0 2px rgba(0,0,0,0.5)",
-                            }}>
-                              {county.name}
-                            </text>
-                            <text textAnchor="middle" dominantBaseline="middle" style={{
-                              fontFamily: "system-ui", fill: "#fff",
-                              fontSize: county.adjustedListings > 10000 ? "10px" : "9px",
-                              fontWeight: "bold", pointerEvents: "none",
-                              textShadow: "0 1px 2px rgba(0,0,0,0.5)",
+                            <text textAnchor="middle" dominantBaseline="middle" dy={-1} style={{
+                              fontFamily: "system-ui", fill: "#fff", fontSize: "8px", fontWeight: "bold",
+                              pointerEvents: "none",
+                              textShadow: "0 1px 3px rgba(0,0,0,0.8), 0 0 2px rgba(0,0,0,0.6)",
                             }}>
                               {formatCount(county.adjustedListings)}
                             </text>
                           </Marker>
-                        )
-                      })}
+                        ))
+                      }
                     </ComposableMap>
+
+                    {/* Hover tooltip */}
+                    {hoveredCounty && (
+                      <div className="absolute top-4 left-1/2 -translate-x-1/2 z-20 bg-white/95 backdrop-blur-sm rounded-lg shadow-lg border border-gray-200 px-4 py-2 pointer-events-none">
+                        <span className="text-sm font-semibold text-gray-900">{hoveredCounty.name} County</span>
+                        <span className="text-sm text-gray-500 ml-2">{hoveredCounty.listings.toLocaleString()} listings</span>
+                      </div>
+                    )}
                   </div>
                 )
               })()}
 
-              {/* County level: Mercator zoomed tighter, individual pins */}
+              {/* County level: zoomed to county, individual pins */}
               {mapLevel === "county" && (() => {
                 const si = STATE_LISTINGS.find((s) => s.abbr === selectedState)
                 const ci = countyData.find((c) => c.name === selectedCounty)
                 if (!si) return null
-                // Zoom ~2.5x tighter than state level, centered on county
                 const countyCenter: [number, number] = ci ? ci.coords : si.center
                 const countyScale = si.scale * 2.5
+                const fips = STATE_FIPS[si.abbr]
                 return (
                   <div className="w-full h-full">
                     <ComposableMap
@@ -470,22 +496,26 @@ export default function SearchPage() {
                       height={600}
                       style={{ width: "100%", height: "100%" }}
                     >
-                      <Geographies geography={geoUrl}>
-                        {({ geographies }) =>
-                          geographies.map((geo) => {
-                            const isThis = geo.properties.name === si.name
+                      {/* County boundaries as context */}
+                      <Geographies geography={countiesGeoUrl}>
+                        {({ geographies }) => {
+                          const stateCounties = geographies.filter(
+                            (geo) => String(geo.id).padStart(5, "0").startsWith(fips)
+                          )
+                          return stateCounties.map((geo) => {
+                            const isTarget = geo.properties.name === selectedCounty
                             return (
                               <Geography
                                 key={geo.rsmKey}
                                 geography={geo}
-                                fill={isThis ? "#eff6ff" : "#f9fafb"}
-                                stroke={isThis ? "#93c5fd" : "#e5e7eb"}
-                                strokeWidth={isThis ? 1 : 0.3}
+                                fill={isTarget ? "#dbeafe" : "#f3f4f6"}
+                                stroke={isTarget ? "#93c5fd" : "#d1d5db"}
+                                strokeWidth={isTarget ? 1.5 : 0.5}
                                 style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }}
                               />
                             )
                           })
-                        }
+                        }}
                       </Geographies>
                       {filteredListings.map((listing) => {
                         const source = SOURCES.find((s) => s.id === listing.source)
