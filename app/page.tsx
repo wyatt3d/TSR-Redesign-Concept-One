@@ -281,8 +281,8 @@ export default function SearchPage() {
           {/* ─── MAP VIEW ──────────────────────────────────── */}
           {viewMode === "map" && (
             <div className="flex-1 relative">
-              {/* National + State level: choropleth with labels */}
-              {(mapLevel === "national" || mapLevel === "state") && (
+              {/* National level: AlbersUsa choropleth */}
+              {mapLevel === "national" && (
                 <div className="w-full h-full">
                   <ComposableMap
                     projection="geoAlbersUsa"
@@ -297,31 +297,17 @@ export default function SearchPage() {
                           const stateName = geo.properties.name
                           const stateInfo = STATE_LISTINGS.find((s) => s.name === stateName)
                           const count = stateInfo?.totalListings ?? 0
-                          const isSelected = stateInfo?.abbr === selectedState
-
                           return (
                             <Geography
                               key={geo.rsmKey}
                               geography={geo}
-                              fill={
-                                mapLevel === "state" && !isSelected
-                                  ? "#e5e7eb"
-                                  : mapLevel === "state" && isSelected
-                                  ? "#bfdbfe"
-                                  : getDensityColor(count, maxStateListings)
-                              }
+                              fill={getDensityColor(count, maxStateListings)}
                               stroke="#fff"
-                              strokeWidth={isSelected ? 2 : 0.75}
-                              onClick={() => {
-                                if (mapLevel === "national") handleStateClick(stateName)
-                              }}
+                              strokeWidth={0.75}
+                              onClick={() => handleStateClick(stateName)}
                               style={{
-                                default: { outline: "none", cursor: mapLevel === "national" ? "pointer" : "default" },
-                                hover: {
-                                  outline: "none",
-                                  fill: mapLevel === "national" ? "#1e40af" : undefined,
-                                  cursor: mapLevel === "national" ? "pointer" : "default",
-                                },
+                                default: { outline: "none", cursor: "pointer" },
+                                hover: { outline: "none", fill: "#1e40af", cursor: "pointer" },
                                 pressed: { outline: "none" },
                               }}
                             />
@@ -329,117 +315,132 @@ export default function SearchPage() {
                         })
                       }
                     </Geographies>
-
-                    {/* National level: state count labels */}
-                    {mapLevel === "national" &&
-                      STATE_LISTINGS.filter((s) => s.totalListings > 10000).map((stateInfo) => (
-                        <Marker key={stateInfo.abbr} coordinates={stateInfo.coords}>
-                          <text
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            style={{
-                              fontFamily: "system-ui",
-                              fill: stateInfo.totalListings > 50000 ? "#fff" : "#1e3a5f",
-                              fontSize: "9px",
-                              fontWeight: "bold",
-                              textShadow: stateInfo.totalListings > 50000 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
-                              pointerEvents: "none",
-                            }}
-                          >
-                            {formatCount(stateInfo.totalListings)}
-                          </text>
-                        </Marker>
-                      ))
-                    }
-
-                    {/* State level: county bubbles */}
-                    {mapLevel === "state" &&
-                      countyData.map((county) => (
-                        <Marker key={county.name} coordinates={county.coords}>
-                          <circle
-                            r={Math.max(6, Math.min(22, Math.sqrt(county.listings / maxCountyListings) * 28))}
-                            fill={getDensityColor(county.listings, maxCountyListings)}
-                            stroke="#fff"
-                            strokeWidth={1.5}
-                            opacity={0.85}
-                            style={{ cursor: "pointer" }}
-                            onClick={() => handleCountyClick(county)}
-                          />
-                          <text
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            dy={-Math.max(8, Math.min(24, Math.sqrt(county.listings / maxCountyListings) * 30)) - 4}
-                            style={{
-                              fontFamily: "system-ui",
-                              fill: "#374151",
-                              fontSize: "8px",
-                              fontWeight: 600,
-                              pointerEvents: "none",
-                            }}
-                          >
-                            {county.name}
-                          </text>
-                          <text
-                            textAnchor="middle"
-                            dominantBaseline="middle"
-                            style={{
-                              fontFamily: "system-ui",
-                              fill: "#fff",
-                              fontSize: county.listings > 10000 ? "8px" : "7px",
-                              fontWeight: "bold",
-                              pointerEvents: "none",
-                            }}
-                          >
-                            {formatCount(county.listings)}
-                          </text>
-                        </Marker>
-                      ))
-                    }
+                    {STATE_LISTINGS.filter((s) => s.totalListings > 10000).map((si) => (
+                      <Marker key={si.abbr} coordinates={si.coords}>
+                        <text textAnchor="middle" dominantBaseline="middle" style={{
+                          fontFamily: "system-ui", fill: si.totalListings > 50000 ? "#fff" : "#1e3a5f",
+                          fontSize: "9px", fontWeight: "bold",
+                          textShadow: si.totalListings > 50000 ? "0 1px 2px rgba(0,0,0,0.4)" : "none",
+                          pointerEvents: "none",
+                        }}>
+                          {formatCount(si.totalListings)}
+                        </text>
+                      </Marker>
+                    ))}
                   </ComposableMap>
                 </div>
               )}
 
-              {/* County level: individual listing pins */}
-              {mapLevel === "county" && (
-                <div className="w-full h-full">
-                  <ComposableMap
-                    projection="geoAlbersUsa"
-                    projectionConfig={{ scale: 1100 }}
-                    width={960}
-                    height={600}
-                    style={{ width: "100%", height: "100%" }}
-                  >
-                    <Geographies geography={geoUrl}>
-                      {({ geographies }) =>
-                        geographies.map((geo) => {
-                          const stateName = geo.properties.name
-                          const stateInfo = STATE_LISTINGS.find((s) => s.name === stateName)
-                          const isSelected = stateInfo?.abbr === selectedState
-                          return (
-                            <Geography
-                              key={geo.rsmKey}
-                              geography={geo}
-                              fill={isSelected ? "#dbeafe" : "#e5e7eb"}
+              {/* State level: Mercator zoomed to state, county bubbles */}
+              {mapLevel === "state" && (() => {
+                const si = STATE_LISTINGS.find((s) => s.abbr === selectedState)
+                if (!si) return null
+                return (
+                  <div className="w-full h-full">
+                    <ComposableMap
+                      projection="geoMercator"
+                      projectionConfig={{ center: si.center, scale: si.scale }}
+                      width={960}
+                      height={600}
+                      style={{ width: "100%", height: "100%" }}
+                    >
+                      <Geographies geography={geoUrl}>
+                        {({ geographies }) =>
+                          geographies.map((geo) => {
+                            const isThis = geo.properties.name === si.name
+                            return (
+                              <Geography
+                                key={geo.rsmKey}
+                                geography={geo}
+                                fill={isThis ? "#dbeafe" : "#f3f4f6"}
+                                stroke={isThis ? "#93c5fd" : "#d1d5db"}
+                                strokeWidth={isThis ? 1.5 : 0.5}
+                                style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }}
+                              />
+                            )
+                          })
+                        }
+                      </Geographies>
+                      {countyData.map((county) => {
+                        const r = Math.max(8, Math.min(30, Math.sqrt(county.listings / maxCountyListings) * 35))
+                        return (
+                          <Marker key={county.name} coordinates={county.coords}>
+                            <circle
+                              r={r}
+                              fill={getDensityColor(county.listings, maxCountyListings)}
                               stroke="#fff"
-                              strokeWidth={isSelected ? 2 : 0.5}
-                              style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }}
+                              strokeWidth={2}
+                              opacity={0.85}
+                              style={{ cursor: "pointer" }}
+                              onClick={() => handleCountyClick(county)}
                             />
-                          )
-                        })
-                      }
-                    </Geographies>
-                    {filteredListings.map((listing) => {
-                      const source = SOURCES.find((s) => s.id === listing.source)
-                      if (!source) return null
-                      return (
-                        <Marker key={listing.id} coordinates={[listing.lng, listing.lat]} onClick={() => setSelectedListing(listing)}>
-                          <circle r={4} fill={source.color} stroke="#fff" strokeWidth={1.5} style={{ cursor: "pointer" }} opacity={0.9} />
-                        </Marker>
-                      )
-                    })}
-                  </ComposableMap>
-                </div>
-              )}
+                            <text textAnchor="middle" dominantBaseline="middle" dy={-r - 6} style={{
+                              fontFamily: "system-ui", fill: "#374151", fontSize: "10px", fontWeight: 600, pointerEvents: "none",
+                            }}>
+                              {county.name}
+                            </text>
+                            <text textAnchor="middle" dominantBaseline="middle" style={{
+                              fontFamily: "system-ui", fill: "#fff",
+                              fontSize: county.listings > 10000 ? "10px" : "9px",
+                              fontWeight: "bold", pointerEvents: "none",
+                            }}>
+                              {formatCount(county.listings)}
+                            </text>
+                          </Marker>
+                        )
+                      })}
+                    </ComposableMap>
+                  </div>
+                )
+              })()}
+
+              {/* County level: Mercator zoomed tighter, individual pins */}
+              {mapLevel === "county" && (() => {
+                const si = STATE_LISTINGS.find((s) => s.abbr === selectedState)
+                const ci = countyData.find((c) => c.name === selectedCounty)
+                if (!si) return null
+                // Zoom ~2.5x tighter than state level, centered on county
+                const countyCenter: [number, number] = ci ? ci.coords : si.center
+                const countyScale = si.scale * 2.5
+                return (
+                  <div className="w-full h-full">
+                    <ComposableMap
+                      projection="geoMercator"
+                      projectionConfig={{ center: countyCenter, scale: countyScale }}
+                      width={960}
+                      height={600}
+                      style={{ width: "100%", height: "100%" }}
+                    >
+                      <Geographies geography={geoUrl}>
+                        {({ geographies }) =>
+                          geographies.map((geo) => {
+                            const isThis = geo.properties.name === si.name
+                            return (
+                              <Geography
+                                key={geo.rsmKey}
+                                geography={geo}
+                                fill={isThis ? "#eff6ff" : "#f9fafb"}
+                                stroke={isThis ? "#93c5fd" : "#e5e7eb"}
+                                strokeWidth={isThis ? 1 : 0.3}
+                                style={{ default: { outline: "none" }, hover: { outline: "none" }, pressed: { outline: "none" } }}
+                              />
+                            )
+                          })
+                        }
+                      </Geographies>
+                      {filteredListings.map((listing) => {
+                        const source = SOURCES.find((s) => s.id === listing.source)
+                        if (!source) return null
+                        return (
+                          <Marker key={listing.id} coordinates={[listing.lng, listing.lat]} onClick={() => setSelectedListing(listing)}>
+                            <circle r={5} fill={source.color} stroke="#fff" strokeWidth={1.5} style={{ cursor: "pointer" }} opacity={0.9} />
+                          </Marker>
+                        )
+                      })}
+                    </ComposableMap>
+                  </div>
+                )
+              })()}
 
               {/* Back button (state/county levels) */}
               {mapLevel !== "national" && (
