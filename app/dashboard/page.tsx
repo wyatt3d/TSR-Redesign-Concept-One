@@ -14,11 +14,6 @@ import {
 } from "@/lib/types"
 import {
   TrendingUp,
-  TrendingDown,
-  Building2,
-  MapPin,
-  Calendar,
-  BarChart3,
   ArrowRight,
 } from "lucide-react"
 

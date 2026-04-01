@@ -71,7 +71,6 @@ export function ChatPanel({ onAction, filteredCount, totalCount, onClose }: Chat
     setIsTyping(true)
 
     // Simulate AI response delay, auto-apply filter commands
-    const userMsgId = userMsg.id
     setTimeout(() => {
       const responses = generateMockResponse(text)
       setMessages((prev) => [...prev, ...responses])

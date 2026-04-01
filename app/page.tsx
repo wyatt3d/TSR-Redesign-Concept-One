@@ -14,8 +14,8 @@ import { usePreferences } from "@/hooks/use-preferences"
 import { type ChatAction } from "@/lib/chat-types"
 import { TutorialOverlay } from "@/components/tutorial-overlay"
 import {
-  SlidersHorizontal, List, Layers, ZoomIn, ZoomOut, LocateFixed,
-  MessageSquare, ArrowUpDown, ExternalLink, Building2, ChevronRight, X,
+  SlidersHorizontal, List, Layers, ZoomIn, ZoomOut,
+  MessageSquare, ArrowUpDown, ExternalLink, ChevronRight, X,
 } from "lucide-react"
 
 const statesGeoUrl = "https://cdn.jsdelivr.net/npm/us-atlas@3/states-10m.json"
@@ -61,10 +61,11 @@ export default function SearchPage() {
   const [selectedCounty, setSelectedCounty] = useState<string | null>(null)
   const [hoveredCounty, setHoveredCounty] = useState<{ name: string; listings: number } | null>(null)
 
-  // ─── Custom zoom/pan: right-click drag to pan, inverted scroll to zoom ──
+  // ─── Custom zoom/pan: right-click drag to pan, scroll to zoom ──
   const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
+  const mapDivRef = useRef<HTMLDivElement | null>(null)
 
   // Reset on level change
   useEffect(() => { setTransform({ x: 0, y: 0, scale: 1 }) }, [mapLevel, selectedState, selectedCounty])
@@ -72,12 +73,20 @@ export default function SearchPage() {
   const handleZoomIn = () => setTransform((t) => ({ ...t, scale: Math.min(t.scale * 1.4, 20) }))
   const handleZoomOut = () => setTransform((t) => ({ ...t, scale: Math.max(t.scale / 1.4, 0.3) }))
 
-  // Wheel: inverted (scroll up = zoom in)
-  const onWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const factor = e.deltaY > 0 ? 0.9 : 1.1 // inverted: deltaY>0 (scroll down) = zoom out
-    setTransform((t) => ({ ...t, scale: Math.min(Math.max(t.scale * factor, 0.3), 20) }))
-  }, [])
+  // Attach wheel listener natively with { passive: false } so preventDefault works.
+  // scroll UP (negative deltaY) = zoom IN, scroll DOWN (positive deltaY) = zoom OUT.
+  useEffect(() => {
+    const el = mapDivRef.current
+    if (!el) return
+    const handleWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      e.stopPropagation()
+      const factor = e.deltaY > 0 ? 0.9 : 1.1 // deltaY > 0 → scroll down → zoom out
+      setTransform((t) => ({ ...t, scale: Math.min(Math.max(t.scale * factor, 0.3), 20) }))
+    }
+    el.addEventListener("wheel", handleWheel, { passive: false })
+    return () => { el.removeEventListener("wheel", handleWheel) }
+  }, [viewMode])
 
   // Right-click drag to pan
   const onMouseDown = useCallback((e: React.MouseEvent) => {
@@ -395,10 +404,10 @@ export default function SearchPage() {
           {/* ─── MAP VIEW ──────────────────────────────────── */}
           {viewMode === "map" && (
             <div
+              ref={mapDivRef}
               className="flex-1 relative"
               data-tutorial="map-area"
               onContextMenu={(e) => e.preventDefault()}
-              onWheel={onWheel}
               onMouseDown={onMouseDown}
               onMouseMove={onMouseMove}
               onMouseUp={onMouseUp}
