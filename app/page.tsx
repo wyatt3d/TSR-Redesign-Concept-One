@@ -354,20 +354,16 @@ export default function SearchPage() {
                 </button>
               </div>
 
-              {/* Breadcrumb (map drill-down) */}
-              {viewMode === "map" && (
+              {/* Breadcrumb (only when drilled in) */}
+              {viewMode === "map" && selectedState && (
                 <div className="flex items-center gap-1 text-xs text-gray-500 ml-2">
-                  <button onClick={handleBackToNational} className={`hover:text-[#2a7de1] ${mapLevel === "national" ? "font-semibold text-gray-700" : ""}`}>
-                    United States
+                  <button onClick={handleBackToNational} className="hover:text-[#2a7de1]">
+                    All States
                   </button>
-                  {selectedState && (
-                    <>
-                      <ChevronRight className="w-3 h-3 text-gray-400" />
-                      <button onClick={handleBackToState} className={`hover:text-[#2a7de1] ${mapLevel === "state" ? "font-semibold text-gray-700" : ""}`}>
-                        {selectedState}
-                      </button>
-                    </>
-                  )}
+                  <ChevronRight className="w-3 h-3 text-gray-400" />
+                  <button onClick={handleBackToState} className={`hover:text-[#2a7de1] ${mapLevel === "state" ? "font-semibold text-gray-700" : ""}`}>
+                    {selectedState}
+                  </button>
                   {selectedCounty && (
                     <>
                       <ChevronRight className="w-3 h-3 text-gray-400" />
@@ -383,22 +379,6 @@ export default function SearchPage() {
               </span>
             </div>
 
-            {/* Source dots */}
-            <div className="flex items-center gap-2.5 overflow-x-auto">
-              {activeSourceIds.slice(0, 8).map((sid) => {
-                const src = SOURCES.find((s) => s.id === sid)
-                if (!src) return null
-                return (
-                  <div key={sid} className="flex items-center gap-1 flex-shrink-0">
-                    <div className="w-2 h-2 rounded-full" style={{ backgroundColor: src.color }} />
-                    <span className="text-[10px] text-gray-500 font-medium">{src.shortName}</span>
-                  </div>
-                )
-              })}
-              {activeSourceIds.length > 8 && (
-                <span className="text-[10px] text-gray-400">+{activeSourceIds.length - 8}</span>
-              )}
-            </div>
           </div>
 
           {/* ─── MAP VIEW ──────────────────────────────────── */}
