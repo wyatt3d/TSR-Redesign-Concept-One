@@ -1,12 +1,12 @@
 "use client"
 
-import { useState, useMemo, useCallback, useEffect } from "react"
+import { useState, useMemo, useCallback, useEffect, useRef } from "react"
 import { Header } from "@/components/header"
 import { MapSidebar } from "@/components/map-sidebar"
 import { ListingCard } from "@/components/listing-card"
 import { SourceBadge } from "@/components/source-badge"
 import { ChatPanel } from "@/components/chat-panel"
-import { ComposableMap, Geographies, Geography, Marker, ZoomableGroup } from "react-simple-maps"
+import { ComposableMap, Geographies, Geography, Marker } from "react-simple-maps"
 import { MOCK_LISTINGS } from "@/lib/mock-listings"
 import { STATE_LISTINGS, NATIONAL_TOTAL, getCountiesForState, formatCount, getDensityColor, STATE_FIPS, matchCountyName, type CountyData } from "@/lib/geo-data"
 import { SOURCES, PROPERTY_TYPES, type SourceId, type PropertyType, type DealType, type Listing } from "@/lib/types"
@@ -61,54 +61,41 @@ export default function SearchPage() {
   const [selectedCounty, setSelectedCounty] = useState<string | null>(null)
   const [hoveredCounty, setHoveredCounty] = useState<{ name: string; listings: number } | null>(null)
 
-  // Zoom/pan state for the map
-  const [mapPosition, setMapPosition] = useState<{ coordinates: [number, number]; zoom: number }>({ coordinates: [0, 0], zoom: 1 })
+  // ─── Custom zoom/pan: right-click drag to pan, inverted scroll to zoom ──
+  const [transform, setTransform] = useState({ x: 0, y: 0, scale: 1 })
+  const isPanning = useRef(false)
+  const panStart = useRef({ x: 0, y: 0, tx: 0, ty: 0 })
 
-  const handleZoomIn = () => setMapPosition((p) => ({ ...p, zoom: Math.min(p.zoom * 1.5, 20) }))
-  const handleZoomOut = () => setMapPosition((p) => ({ ...p, zoom: Math.max(p.zoom / 1.5, 0.5) }))
-  const handleMoveEnd = (pos: { coordinates: [number, number]; zoom: number }) => setMapPosition(pos)
+  // Reset on level change
+  useEffect(() => { setTransform({ x: 0, y: 0, scale: 1 }) }, [mapLevel, selectedState, selectedCounty])
 
-  // Reset zoom when map level changes
-  useEffect(() => { setMapPosition({ coordinates: [0, 0], zoom: 1 }) }, [mapLevel, selectedState, selectedCounty])
+  const handleZoomIn = () => setTransform((t) => ({ ...t, scale: Math.min(t.scale * 1.4, 20) }))
+  const handleZoomOut = () => setTransform((t) => ({ ...t, scale: Math.max(t.scale / 1.4, 0.3) }))
 
-  // Right-click to pan + inverted scroll
-  // filterZoomEvent: only allow right-click (button=2) for drag-pan, block left-click drag
-  const filterZoom = useCallback((evt: any) => {
-    if (!evt) return false
-    if (evt.type === "wheel") return true
-    // Only right mouse button (2) triggers pan
-    if (evt.button !== undefined) return evt.button === 2
-    // Touch events pass through
-    if (evt.touches) return true
-    return false
+  // Wheel: inverted (scroll up = zoom in)
+  const onWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    const factor = e.deltaY > 0 ? 0.9 : 1.1 // inverted: deltaY>0 (scroll down) = zoom out
+    setTransform((t) => ({ ...t, scale: Math.min(Math.max(t.scale * factor, 0.3), 20) }))
   }, [])
 
-  // Invert scroll direction on the map container
-  const mapWheelRef = useCallback((node: HTMLDivElement | null) => {
-    if (!node) return
-    const handler = (e: WheelEvent) => {
-      // Find the SVG's d3-zoom
-      const svg = node.querySelector("svg")
-      if (!svg) return
-      e.preventDefault()
-      // Create inverted wheel event and dispatch on the SVG's inner group
-      // d3-zoom listens on the SVG element
-      const synth = new WheelEvent("wheel", {
-        deltaY: -e.deltaY,
-        deltaX: -e.deltaX,
-        deltaMode: e.deltaMode,
-        clientX: e.clientX,
-        clientY: e.clientY,
-        screenX: e.screenX,
-        screenY: e.screenY,
-        bubbles: false,
-        cancelable: true,
-      })
-      svg.dispatchEvent(synth)
-    }
-    node.addEventListener("wheel", handler, { passive: false, capture: true })
-    return () => node.removeEventListener("wheel", handler, { capture: true } as any)
+  // Right-click drag to pan
+  const onMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.button !== 2) return // only right click
+    e.preventDefault()
+    isPanning.current = true
+    panStart.current = { x: e.clientX, y: e.clientY, tx: 0, ty: 0 }
+    setTransform((t) => { panStart.current.tx = t.x; panStart.current.ty = t.y; return t })
   }, [])
+
+  const onMouseMove = useCallback((e: React.MouseEvent) => {
+    if (!isPanning.current) return
+    const dx = e.clientX - panStart.current.x
+    const dy = e.clientY - panStart.current.y
+    setTransform((t) => ({ ...t, x: panStart.current.tx + dx, y: panStart.current.ty + dy }))
+  }, [])
+
+  const onMouseUp = useCallback(() => { isPanning.current = false }, [])
 
   // List view state
   const [sortKey, setSortKey] = useState<SortKey>("daysOnMarket")
@@ -407,10 +394,19 @@ export default function SearchPage() {
 
           {/* ─── MAP VIEW ──────────────────────────────────── */}
           {viewMode === "map" && (
-            <div className="flex-1 relative" data-tutorial="map-area" onContextMenu={(e) => e.preventDefault()} ref={mapWheelRef}>
+            <div
+              className="flex-1 relative"
+              data-tutorial="map-area"
+              onContextMenu={(e) => e.preventDefault()}
+              onWheel={onWheel}
+              onMouseDown={onMouseDown}
+              onMouseMove={onMouseMove}
+              onMouseUp={onMouseUp}
+              onMouseLeave={onMouseUp}
+            >
               {/* National level: AlbersUsa choropleth */}
               {mapLevel === "national" && (
-                <div className="w-full h-full">
+                <div className="w-full h-full overflow-hidden" style={{ transform: `translate(${transform.x}px, ${transform.y}px) scale(${transform.scale})`, transformOrigin: "center center" }}>
                   <ComposableMap
                     projection="geoAlbersUsa"
                     projectionConfig={{ scale: 1100 }}
@@ -418,14 +414,6 @@ export default function SearchPage() {
                     height={600}
                     style={{ width: "100%", height: "100%" }}
                   >
-                    <ZoomableGroup
-                      center={mapPosition.coordinates}
-                      zoom={mapPosition.zoom}
-                      onMoveEnd={handleMoveEnd}
-                      filterZoomEvent={filterZoom}
-                      minZoom={0.5}
-                      maxZoom={20}
-                    >
                     <Geographies geography={statesGeoUrl}>
                       {({ geographies }) =>
                         geographies.map((geo) => {
@@ -464,7 +452,6 @@ export default function SearchPage() {
                         </text>
                       </Marker>
                     ))}
-                    </ZoomableGroup>
                   </ComposableMap>
                 </div>
               )}
@@ -483,11 +470,6 @@ export default function SearchPage() {
                       height={600}
                       style={{ width: "100%", height: "100%" }}
                     >
-                      <ZoomableGroup
-                        filterZoomEvent={filterZoom}
-                        minZoom={0.5}
-                        maxZoom={20}
-                      >
                       {/* County boundaries */}
                       <Geographies geography={countiesGeoUrl}>
                         {({ geographies }) => {
@@ -550,7 +532,6 @@ export default function SearchPage() {
                           </Marker>
                         ))
                       }
-                      </ZoomableGroup>
                     </ComposableMap>
 
                     {/* Hover tooltip */}
@@ -581,11 +562,6 @@ export default function SearchPage() {
                       height={600}
                       style={{ width: "100%", height: "100%" }}
                     >
-                      <ZoomableGroup
-                        filterZoomEvent={filterZoom}
-                        minZoom={0.5}
-                        maxZoom={20}
-                      >
                       {/* County boundaries as context */}
                       <Geographies geography={countiesGeoUrl}>
                         {({ geographies }) => {
@@ -616,7 +592,6 @@ export default function SearchPage() {
                           </Marker>
                         )
                       })}
-                      </ZoomableGroup>
                     </ComposableMap>
                   </div>
                 )
