@@ -71,15 +71,43 @@ export default function SearchPage() {
   // Reset zoom when map level changes
   useEffect(() => { setMapPosition({ coordinates: [0, 0], zoom: 1 }) }, [mapLevel, selectedState, selectedCounty])
 
-  // Only allow right-click drag for panning (button=2), scroll wheel for zoom
-  // Left click (button=0) passes through for clicking states/counties/pins
+  // Right-click to pan + inverted scroll
+  // filterZoomEvent: only allow right-click (button=2) for drag-pan, block left-click drag
   const filterZoom = useCallback((evt: any) => {
-    if (!evt) return true
-    // Always allow wheel events (zoom)
+    if (!evt) return false
     if (evt.type === "wheel") return true
-    // For mouse events, only allow right button (2) for pan
-    if (evt.type === "mousedown") return evt.button === 2
-    return true
+    // Only right mouse button (2) triggers pan
+    if (evt.button !== undefined) return evt.button === 2
+    // Touch events pass through
+    if (evt.touches) return true
+    return false
+  }, [])
+
+  // Invert scroll direction on the map container
+  const mapWheelRef = useCallback((node: HTMLDivElement | null) => {
+    if (!node) return
+    const handler = (e: WheelEvent) => {
+      // Find the SVG's d3-zoom
+      const svg = node.querySelector("svg")
+      if (!svg) return
+      e.preventDefault()
+      // Create inverted wheel event and dispatch on the SVG's inner group
+      // d3-zoom listens on the SVG element
+      const synth = new WheelEvent("wheel", {
+        deltaY: -e.deltaY,
+        deltaX: -e.deltaX,
+        deltaMode: e.deltaMode,
+        clientX: e.clientX,
+        clientY: e.clientY,
+        screenX: e.screenX,
+        screenY: e.screenY,
+        bubbles: false,
+        cancelable: true,
+      })
+      svg.dispatchEvent(synth)
+    }
+    node.addEventListener("wheel", handler, { passive: false, capture: true })
+    return () => node.removeEventListener("wheel", handler, { capture: true } as any)
   }, [])
 
   // List view state
@@ -379,7 +407,7 @@ export default function SearchPage() {
 
           {/* ─── MAP VIEW ──────────────────────────────────── */}
           {viewMode === "map" && (
-            <div className="flex-1 relative" data-tutorial="map-area" onContextMenu={(e) => e.preventDefault()}>
+            <div className="flex-1 relative" data-tutorial="map-area" onContextMenu={(e) => e.preventDefault()} ref={mapWheelRef}>
               {/* National level: AlbersUsa choropleth */}
               {mapLevel === "national" && (
                 <div className="w-full h-full">
@@ -394,6 +422,7 @@ export default function SearchPage() {
                       center={mapPosition.coordinates}
                       zoom={mapPosition.zoom}
                       onMoveEnd={handleMoveEnd}
+                      filterZoomEvent={filterZoom}
                       minZoom={0.5}
                       maxZoom={20}
                     >
